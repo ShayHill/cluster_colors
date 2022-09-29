@@ -1,0 +1,35 @@
+{
+  "include": [
+    "src"
+  ],
+
+  "exclude": [
+    "**/__pycache__",
+  ],
+
+  "ignore": [
+  ],
+
+  "defineConstant": {
+    "DEBUG": true
+  },
+
+  "typeCheckingMode": "strict"
+
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false,
+  "reportCallInDefaultInitializer": true,
+  "reportImplicitStringConcatenation": true,
+  "reportMissingSuperCall": false,
+  "reportPropertyTypeMismatch": true,
+  "reportUninitializedInstanceVariable": true,
+  "reportUnnecessaryTypeIgnoreComment": true,
+  "reportUnusedCallResult": true,
+
+  "pythonVersion": "3.10.6",
+  "pythonPlatform": "Windows",
+
+  "extraPaths": [
+    "my_cluster_colors"
+  ],
+}

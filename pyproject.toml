@@ -1,0 +1,6 @@
+[tool.isort]
+profile = "black"
+
+[tool.pytest.ini_options]
+#addopts = "-rfEX -p pytester --strict-markers --ignore=my_triangulate_image/my_geometry --ignore=my_geometry"
+pythonpath = ["my_cluster_colors"]
