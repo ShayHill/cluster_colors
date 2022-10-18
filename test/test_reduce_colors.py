@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 220921 17:02:05
+# last modified: 221018 10:27:43
 """Test reduce_colors() function.
 
 :author: Shay Hill
@@ -18,6 +18,8 @@ import numpy as np
 import pytest
 
 from cluster_colors import reduce_colors
+from PIL import Image
+
 
 _T = TypeVar("_T")
 
@@ -84,6 +86,25 @@ class TestMapAveragesToNbitRepresentations:
         for average, sum_weight in zip(averaged_by_nbits.values(), diag_sums):
             assert sum_weight == average[3]
 
-    def test_weight_means(self, diag_means, averaged_by_nbits):
-        for average, mean_weight in zip(averaged_by_nbits.values(), diag_means):
-            np.testing.assert_allclose([mean_weight] * 3, average[:3])
+
+class TestReduceColors:
+    def test_sum_weight(self):
+        """Total weight of all colors is number of pixels."""
+        img = Image.open("test/sugar-shack-barnes.jpg")
+        colors = np.array(img)
+        weights = np.full(colors.shape[:-1], 1, dtype=float)
+        weighted_colors = np.dstack((colors, weights))
+        reduced = reduce_colors.reduce_colors(weighted_colors, 4)
+        assert np.sum(reduced[..., 3]) == colors.shape[0] * colors.shape[1]
+
+    def test_robust_to_order(self):
+        """Order of colors should not matter."""
+        img = Image.open("test/sugar-shack-barnes.jpg")
+        colors = np.array(img)
+        weights = np.full(colors.shape[:-1], 1, dtype=float)
+        weighted_colors = np.dstack((colors, weights))
+        reduced = {tuple(x) for x in reduce_colors.reduce_colors(weighted_colors, 4)}
+        reduced2 = {
+            tuple(x) for x in reduce_colors.reduce_colors(weighted_colors[::-1], 4)
+        }
+        assert reduced == reduced2

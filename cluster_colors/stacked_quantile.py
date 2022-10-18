@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 220929 12:06:52
+# last modified: 220929 20:49:54
 """'Stacked' quantile functions. Close to weighted quantile functions.
 
 These functions are used to calculate quantiles of a set of values, where each value
@@ -34,7 +34,7 @@ This "weights as occurrences" interpretation has two pitfalls:
 :author: Shay Hill
 :created: 2022-09-23
 """
-from typing import Any, TypeAlias, cast
+from typing import Any, TypeAlias, cast, Iterable
 
 import numpy as np
 import numpy.typing as npt
@@ -42,7 +42,11 @@ import numpy.typing as npt
 _FPArray: TypeAlias = npt.NDArray[np.floating[Any]]
 
 
-def get_stacked_quantile(values: _FPArray, weights: _FPArray, quantile: float) -> float:
+def get_stacked_quantile(
+    values: Iterable[float] | _FPArray,
+    weights: Iterable[float] | _FPArray,
+    quantile: float,
+) -> float:
     """Get a weighted quantile for a value.
 
     :param values: array of values with shape (n,)
@@ -54,27 +58,29 @@ def get_stacked_quantile(values: _FPArray, weights: _FPArray, quantile: float) -
     :raises ValueError: if values array is empty (after removing zero-weight values)
     :raises ValueError: if weights are not all positive
     """
-    if values.shape[-1] != weights.shape[-1]:
-        raise ValueError("values and weights must be the same length")
+    avalues: _FPArray = np.asarray(values)
+    aweights: _FPArray = np.asarray(weights)
+    if avalues.shape[-1] != aweights.shape[-1]:
+        raise ValueError("avalues and aweights must be the same length")
     if quantile < 0 or quantile > 1:
         raise ValueError("quantile must be in interval [0, 1]")
 
-    values, weights = values[weights != 0], weights[weights != 0]
+    avalues, aweights = avalues[aweights != 0], aweights[aweights != 0]
 
-    if not len(values):
-        raise ValueError("values empty (after removing zero-weight values)")
-    if any(weight < 0 for weight in weights):
-        raise ValueError("weights must be non-negative")
+    if not len(avalues):
+        raise ValueError("avalues empty (after removing zero-weight avalues)")
+    if any(weight < 0 for weight in aweights):
+        raise ValueError("aweights must be non-negative")
 
-    sorter = np.argsort(values)
-    sorted_values = values[sorter]
-    sorted_weights = weights[sorter]
-    cum_weights = cast(_FPArray, np.cumsum(sorted_weights))
-    target = cum_weights[-1] * quantile
-    index = np.searchsorted(cum_weights, target, side="right")
+    sorter = np.argsort(avalues)
+    sorted_values = avalues[sorter]
+    sorted_weights = aweights[sorter]
+    cum_aweights = cast(_FPArray, np.cumsum(sorted_weights))
+    target = cum_aweights[-1] * quantile
+    index = np.searchsorted(cum_aweights, target, side="right")
     if index == 0:
         return sorted_values[0]
-    if np.isclose(cum_weights[index - 1], target):
+    if np.isclose(cum_aweights[index - 1], target):
         lower = sorted_values[index - 1]
         upper = sorted_values[index]
         return (lower + upper) / 2
@@ -108,7 +114,9 @@ def get_stacked_quantiles(
     return np.array(by_axis)
 
 
-def get_stacked_median(values: _FPArray, weights: _FPArray) -> float:
+def get_stacked_median(
+    values: Iterable[float] | _FPArray, weights: Iterable[float] | _FPArray
+) -> float:
     """Get a weighted median for a value.
 
     :param values: array of values with shape (n,)

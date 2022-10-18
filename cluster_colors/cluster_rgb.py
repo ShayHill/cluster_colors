@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 220929 12:40:03
+# last modified: 221001 16:12:25
 """Cluster RGB values, no optimization.
 
 Cluster into an indeterminate number of groups. Will be fine for a small number of
@@ -11,27 +11,19 @@ colors.
 :created: 2022-09-14
 """
 
-from operator import itemgetter
 from __future__ import annotations
+
 import functools
 import itertools
 import math
 from contextlib import suppress
-from operator import attrgetter
-from typing import (
-    Annotated,
-    Any,
-    Callable,
-    Iterable,
-    Optional,
-    TypeAlias,
-    TypeVar,
-)
+from operator import attrgetter, itemgetter
+from typing import Annotated, Any, Callable, Iterable, Optional, TypeAlias, TypeVar
 
-from cluster_colors.rgb_members_and_clusters import Cluster, Member, \
-    _get_squared_error
 import numpy as np
 import numpy.typing as npt
+
+from cluster_colors.rgb_members_and_clusters import Cluster, Member, get_squared_error
 
 _MAX_ITERATIONS = 1000
 
@@ -47,6 +39,7 @@ _FourInts: TypeAlias = tuple[int, int, int, int]
 _ColorArray = (
     Annotated[npt.NDArray[np.uint8], "(..., 3) | (..., 4)"] | Iterable[Iterable[int]]
 )
+
 
 class _ErrorGetter:
     """Call the cached methods in _Cluster with cluster instances as arguments."""
@@ -94,7 +87,7 @@ class _ClusterMerger(_ErrorGetter):
     """Merge clusters in self.clusters with the lowest cost.
 
     Examine all clusters in self.clusters. Find the two closest clusters, A and B.
-    Pass members from B to A and remove B from self.clusters.
+    Remove these clusters and add a new cluster with their combined members.
     """
 
     def __init__(self, clusters: set[Cluster]) -> None:
@@ -109,7 +102,7 @@ class _ClusterMerger(_ErrorGetter):
         min_cluster_a: Optional[Cluster] = None
         min_cluster_b: Optional[Cluster] = None
         for cluster_a, cluster_b in itertools.combinations(self.clusters, 2):
-            cost = self.get_half_exemplar_span(cluster_a, cluster_b)
+            cost = cluster_a.get_squared_error(cluster_b.exemplar)
             if cost < min_cost:
                 min_cost = cost
                 min_cluster_a = cluster_a
@@ -128,8 +121,10 @@ class _ClusterMerger(_ErrorGetter):
         min_cost, min_cluster_a, min_cluster_b = self._find_min_cost()
         if min_cost > merge_below_cost:
             return False
+        combined_members = min_cluster_a.members | min_cluster_b.members
         self.clusters.remove(min_cluster_b)
-        min_cluster_a.queue_add |= min_cluster_b.members
+        self.clusters.remove(min_cluster_b)
+        self.clusters.add(Cluster(combined_members))
         return True
 
 
@@ -186,14 +181,20 @@ class _Clusters(_ErrorGetter):
         max_span: float = math.inf,
     ) -> None:
         self.clusters = {Cluster(Member.new_members(colors))}
+
         self.splitter = _ClusterSplitter(self.clusters)
         self.merger = _ClusterMerger(self.clusters)
         self.reassigner = _ClusterReassigner(self.clusters)
 
+    @property
+    def clusters(self) -> set[Cluster]:
+        return self.new_clusters | self.old_clusters
+
     def _process_queues(self) -> None:
         """Apply queued changes to clusters."""
-        for cluster in self.clusters:
-            cluster.process_queue()
+        prev_clusters = tuple(self.clusters)
+        self.clusters.clear()
+        self.clusters |= {c.process_queue() for c in prev_clusters}
 
     def converge(self) -> None:
         """Reassign members until no changes occur."""
@@ -299,39 +300,41 @@ def get_biggest_color(
     return _get_cluster_tuple(max(clusters, key=attrgetter("weight")))
 
 
-# if __name__ == "__main__":
-# # open image, convert to array, and pass color array to get_biggest_color
-# from PIL import Image
-# from PIL.Image import MAXCOVERAGE, FASTOCTREE
+if __name__ == "__main__":
+    # open image, convert to array, and pass color array to get_biggest_color
+    from PIL import Image
+    from PIL.Image import MAXCOVERAGE, FASTOCTREE
 
-# image = Image.open("smooth_form.jpg")
-# # colors = img.getcolor(256)
-# count_colors = 160**2
-# # try:
-# # image = image.quantize(colors=count_colors, method=MAXCOVERAGE)
-# # except ValueError:
-# # image = image.quantize(colors=count_colors, method=FASTOCTREE)
-# # count_colors = len(image.getcolors())
-# # if count_colors < count_colors:
-# # image = image.quantize(count_colors, method=2)
+    img = Image.open("sugar-shack-barnes.jpg")
+    img.quantize(256)
+    colors = img.getcolors(256)
+    breakpoint()
+    count_colors = 160**2
+    # try:
+    # image = image.quantize(colors=count_colors, method=MAXCOVERAGE)
+    # except ValueError:
+    # image = image.quantize(colors=count_colors, method=FASTOCTREE)
+    # count_colors = len(image.getcolors())
+    # if count_colors < count_colors:
+    # image = image.quantize(count_colors, method=2)
 
-# # result = image.convert('P', colors=count_colors)
-# # breakpoint()
-# colors = np.array(image)
+    # result = image.convert('P', colors=count_colors)
+    # breakpoint()
+    colors = np.array(image)
 
-# # colors = np.array(image.getpalette()).reshape((-1, 3))
+    # colors = np.array(image.getpalette()).reshape((-1, 3))
 
-# # colors = img.quantize(colors=256).getcolors(img.width * img.height)
-# # reakpoint()
-# # colors = np.array(img)
-# # colors = [x[1]+(x[0],) for x in colors]
+    # colors = img.quantize(colors=256).getcolors(img.width * img.height)
+    # reakpoint()
+    # colors = np.array(img)
+    # colors = [x[1]+(x[0],) for x in colors]
 
-# # time how long it takes to get the dominant color
-# import time
+    # time how long it takes to get the dominant color
+    import time
 
-# start = time.time()
-# color = get_biggest_color(colors)
-# end = time.time()
-# print(f"Time: {end - start:.2f} seconds")
+    start = time.time()
+    color = get_biggest_color(colors)
+    end = time.time()
+    print(f"Time: {end - start:.2f} seconds")
 
-# print(color)
+    print(color)

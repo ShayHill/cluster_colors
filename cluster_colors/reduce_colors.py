@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-# last modified: 220921 21:48:01
+# last modified: 221001 20:12:17
 """Reduce colors by grouping into n-bit representions.
 
-A reasonable way to reduce 24-bit colors (8 bits per channel, 16_777_216 possible
-colors) to 1, 8, 64, 512, 4096, 32_768, 262_144, or 2_097_152 possible colors without
-Scipy.
+A reasonable and deterministic way to reduce 24-bit colors (8 bits per channel,
+16_777_216 possible colors) to 1, 8, 64, 512, 4096, 32_768, 262_144, or 2_097_152
+possible colors without Scipy.
 
 :author: Shay Hill
 :created: 2022-09-19
@@ -17,40 +17,13 @@ from typing import Any, Literal, TypeVar
 import numpy as np
 import numpy.typing as npt
 
-from cluster_colors.weighted_average import get_weighted_average
+from cluster_colors.stacked_quantile import get_stacked_medians
 
-_T = TypeVar("_T")
 _FPArray = npt.NDArray[np.floating[Any]]
-_B8Array = npt.NDArray[np.uint8]
+_NBits = Literal[1, 2, 3, 4, 5, 6, 7, 8]
 
 
-def _get_nbit(color: _FPArray, nbits: int) -> tuple[int, int, int]:
-    """Get n-bit representation of color."""
-    den = 2 ** (8 - nbits)
-    r, g, b = color[:3]
-    return r // den, g // den, b // den
-
-
-def _add_weight(colors: _FPArray, alpha_is_transparency: bool = False) -> _FPArray:
-    """Add or infer an alpha channel (to be used as weight).
-
-    :param colors: array of rgb colors with shape (..., 3) or rgba with shape (..., 4)
-    :param alpha_is_transparency: if True, infer alpha channel from 255 - transparency
-    :return: array of rgba colors, with shape (..., 4)
-
-    If alpha channel is missing, add it with value 255.
-    If alpha channed is present, and alpha_is_transparency is True, invert it.
-    If alpha channel is present, and alpha_is_transparency is False, do nothing.
-    """
-    if colors.shape[-1] == 4:
-        if alpha_is_transparency:
-            colors[..., 3] = 255 - colors[..., 3]
-        return colors
-    alpha = np.full(colors.shape[:-1], 255, dtype=float)
-    return np.dstack((colors, alpha))  # type: ignore
-
-
-def _rgb_to_nbit(colors: _FPArray, nbits: int) -> npt.NDArray[np.uint8]:
+def _rgb_to_nbit(colors: _FPArray, nbits: _NBits) -> npt.NDArray[np.uint8]:
     """Convert 8-bit rgb portion of [r, g, b, a] colors to n-bit integers.
 
     :param colors: array of rgba colors, with shape (..., 4)
@@ -62,7 +35,7 @@ def _rgb_to_nbit(colors: _FPArray, nbits: int) -> npt.NDArray[np.uint8]:
 
 
 def _groupby_array(
-        vvals: npt.NDArray[Any], vkeys: npt.NDArray[Any]
+    vvals: npt.NDArray[Any], vkeys: npt.NDArray[Any]
 ) -> dict[tuple[Any, ...], npt.NDArray[Any]]:
     """Group vvals by vkeys.
 
@@ -76,8 +49,8 @@ def _groupby_array(
     """
     nbit2colors: dict[tuple[Any, ...], list[npt.NDArray[Any]]] = {}
 
-    vvals_ = np.reshape(vvals, (-1, vvals.shape[-1]))  # type: ignore
-    vkeys_ = np.reshape(vkeys, (-1, vkeys.shape[-1]))  # type: ignore
+    vvals_ = np.reshape(vvals, (-1, vvals.shape[-1]))
+    vkeys_ = np.reshape(vkeys, (-1, vkeys.shape[-1]))
     for key, val in zip(vkeys_, vvals_):
         key_ = tuple(key)
         try:
@@ -88,7 +61,7 @@ def _groupby_array(
 
 
 def _groupby_nbit(
-        colors: _FPArray, nbits: Literal[1, 2, 3, 4, 5, 6, 7, 8]
+    colors: _FPArray, nbits: _NBits
 ) -> dict[tuple[int, int, int], _FPArray]:
     """Group colors by n-bit representation.
 
@@ -103,8 +76,19 @@ def _groupby_nbit(
     return _groupby_array(colors, nbit_representations)
 
 
+def _combine_weighted_colors(rgbws: _FPArray) -> _FPArray:
+    """Get median color and sum of weights.
+
+    :param rgbws: array of colors and weights, with shape (..., 4)
+    :return: array of median color and sum of weights, with shape (..., 4)
+    """
+    rgbs, ws = rgbws[..., :3], rgbws[..., 3:]
+    median_color = get_stacked_medians(rgbs, ws)
+    return np.concatenate([median_color, np.sum(ws, axis=0)])  # type: ignore
+
+
 def _map_averages_to_nbit(
-        colors: _FPArray, nbits: Literal[1, 2, 3, 4, 5, 6, 7, 8]
+    colors: _FPArray, nbits: _NBits
 ) -> dict[tuple[int, int, int], _FPArray]:
     """Get reduced colors.
 
@@ -113,15 +97,15 @@ def _map_averages_to_nbit(
     :return: array of reduced colors, with shape (..., 4)
     """
     nbit2colors = _groupby_nbit(colors, nbits)
-    return {k: get_weighted_average(v) for k, v in nbit2colors.items()}
+    return {k: _combine_weighted_colors(v) for k, v in nbit2colors.items()}
 
 
-from PIL import Image
+def reduce_colors(colors: npt.NDArray[Any], nbits: _NBits) -> _FPArray:
+    """Reduce 8-bit colors (each with a weight) to a maximum of (2**nbits)**3 colors.
 
-img = Image.open("sugar-shack-barnes.jpg")
-colors = np.array(img)
-import time
-
-start = time.time()
-aaa = _groupby_nbit(colors, 3)
-print(time.time() - start)
+    :param colors: array of colors, with shape (..., 4)
+    :param nbits: number of bits per channel
+    :return: array of reduced colors, with shape (..., 4)
+    """
+    nbit2colors = _map_averages_to_nbit(colors, nbits)
+    return np.array(list(nbit2colors.values()))

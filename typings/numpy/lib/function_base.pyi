@@ -413,3 +413,6 @@ def digitize(x: _ArrayLikeFloat_co, bins: _ArrayLikeFloat_co, right: bool = ...)
 def average(a: _ArrayLikeFloat_co, axis: None | _ShapeLike = ..., weights: None | _ArrayLikeFloat_co = ..., returned: bool = ...) -> Union[floating[Any], Tuple[floating[Any], NDArray[floating[Any]]]]:
     ...
 
+def cov(m: Any, y: None | Any, rowvar: bool = ..., bias: bool = ..., ddof: None | SupportsIndex = ..., fweights: None | Any, aweights: None | Any = ...) -> NDArray[floating[Any]]:
+    ...
+
