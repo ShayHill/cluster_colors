@@ -29,7 +29,7 @@ def thin_cluster() -> cluster_colors.rgb_members_and_clusters.Cluster:
 @pytest.fixture(scope="module")
 def quantized_pixels() -> npt.NDArray[np.uint8]:
     """Image test/sugar-shack-barnes.jpg quantized to 256 colors."""
-    return np.array(Image.open("test/sugar-shack-barnes.jpg").quantize(256))
+    return np.array(Image.open("sugar-shack-barnes.jpg").quantize(256))
 
 
 class TestMemberNewMembers:
@@ -37,7 +37,6 @@ class TestMemberNewMembers:
 
     def test_one_member_per_color(self, quantized_pixels) -> None:
         """Return one member per unique color"""
-        breakpoint()
         members = cluster_rgb.Member.new_members(quantized_pixels)
         assert len(members) == 256
 

@@ -61,7 +61,7 @@ def get_stacked_quantile(
     avalues: _FPArray = np.asarray(values)
     aweights: _FPArray = np.asarray(weights)
     if avalues.shape[-1] != aweights.shape[-1]:
-        raise ValueError("avalues and aweights must be the same length")
+        raise ValueError("values and weights must be the same length")
     if quantile < 0 or quantile > 1:
         raise ValueError("quantile must be in interval [0, 1]")
 

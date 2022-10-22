@@ -60,35 +60,35 @@ class Member:
     def w(self) -> float:
         return self.rgbw[3]
 
-    @staticmethod
-    def _color_to_rgbw(color: Iterable[float]) -> _FourInts:
-        """Add a weight of 255 to a 3-value vector. Infer weight for 4-value vector.
+    # @staticmethod
+    # def _color_to_rgbw(color: Iterable[float]) -> _FourInts:
+        # """Add a weight of 255 to a 3-value vector. Infer weight for 4-value vector.
 
-        :param color: rgb or rgba tuple
-        :return: rwbw tuple
-        :raises TypeError: if color cannot be cast to int without loss of precision
-        :raises ValueError: if color is not in [0..255]
-        :raises ValueError: if color is not a 3- or 4-tuple
+        # :param color: rgb or rgba tuple
+        # :return: rwbw tuple
+        # :raises TypeError: if color cannot be cast to int without loss of precision
+        # :raises ValueError: if color is not in [0..255]
+        # :raises ValueError: if color is not a 3- or 4-tuple
 
-        For an rgb tuple, the weight is 255.
-        For an rgba tuple, the alpha value float subtracted from 255 to get the weight.
+        # For an rgb tuple, the weight is 255.
+        # For an rgba tuple, the alpha value float subtracted from 255 to get the weight.
 
-            >>> Member._color_to_rgbw((1, 2, 3))
-            (1, 2, 3, 255)
+            # >>> Member._color_to_rgbw((1, 2, 3))
+            # (1, 2, 3, 255)
 
-            >>> Member._color_to_rgbw((1, 2, 3, 4))
-            (1, 2, 3, 4)
-        """
-        color = tuple(color)
-        if not all(0 <= x <= 255 for x in color[:3]):
-            raise ValueError("color values must be in [0..255]")
-        if any(x % 1 for x in color):
-            raise TypeError("color values must castable to int without loss")
-        if len(color) == 3:
-            r, g, b = (int(x) for x in color)
-            return (r, g, b, 255)
-        elif len(color) != 4:
-            raise ValueError(f"color must be 3 or 4 values, not {len(color)}")
+            # >>> Member._color_to_rgbw((1, 2, 3, 4))
+            # (1, 2, 3, 4)
+        # """
+        # color = tuple(color)
+        # if not all(0 <= x <= 255 for x in color[:3]):
+            # raise ValueError("color values must be in [0..255]")
+        # if any(x % 1 for x in color):
+            # raise TypeError("color values must castable to int without loss")
+        # if len(color) == 3:
+            # r, g, b = (int(x) for x in color)
+            # return (r, g, b, 255)
+        # elif len(color) != 4:
+            # raise ValueError(f"color must be 3 or 4 values, not {len(color)}")
 
     @classmethod
     def new_members(cls, colors: _ColorArray) -> set[Member]:
@@ -101,19 +101,20 @@ class Member:
         Silently drop colors without weight. It is possible to return an empty set if
         no colors have weight > 0.
         """
-        if isinstance(colors, np.ndarray):
-            colors = colors.reshape(-1, colors.shape[-1])
-        rgbws = [cls._color_to_rgbw(color) for color in colors]
+        # TODO: delete commented-out code in Member.new_members
+        # if isinstance(colors, np.ndarray):
+            # colors = colors.reshape(-1, colors.shape[-1])
+        # rgbws = [cls._color_to_rgbw(color) for color in colors]
 
-        if not all(x[3] >= 0 for x in rgbws):
-            raise ValueError("color weights must be non-negative")
+        # if not all(x[3] >= 0 for x in rgbws):
+            # raise ValueError("color weights must be non-negative")
 
-        rgbws = [x for x in rgbws if x[3] > 0]
+        # rgbws = [x for x in rgbws if x[3] > 0]
 
-        color2weight: DefaultDict[_RgbF, float] = defaultdict(float)
-        for r, g, b, w in rgbws:
-            color2weight[(r, g, b)] += w
-        return {cls(np.array(k + (v,))) for k, v in color2weight.items()}
+        # color2weight: DefaultDict[_RgbF, float] = defaultdict(float)
+        # for r, g, b, w in rgbws:
+            # color2weight[(r, g, b)] += w
+        # return {cls(np.array(k + (v,))) for k, v in color2weight.items()}
 
 
 class Cluster:

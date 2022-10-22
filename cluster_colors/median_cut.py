@@ -1,3 +1,20 @@
+#!/usr/bin/env python3
+# last modified: 221021 19:21:43
+"""Cluster colors with median cut.
+
+Repeatedly subdivide the color space by splitting alond the longest axis (not
+constrained to x, y, or z. splits with the optimal plane).
+
+This is a pretty naive median cut, so it is a poor choice for splitting to a low
+number of colors because every cluster is recursively split (clusters are not cherry
+picked to maximize a small number of palette entries.) The idea is to split to around
+512 colors then merge those into a single cluster and split *again*, this time *with*
+cherry picking.
+
+:author: Shay Hill
+:created: 2022-10-21
+"""
+=
 import numpy as np
 import numpy.typing as npt
 from typing import Annotated, Any, Iterable, cast, Sequence, TypeAlias

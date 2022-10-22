@@ -19,3 +19,14 @@ Disadvantages:
 This clustering is designed for questions like "what are the two dominant colors in this image (respecting transparency)?"
 
 Once you split a cluster, it's acceptable to just throw it away. And you will probably only need the exemplars of the clusters you do keep, though you could re-cluster each cluster's members for a semi-hierarchal clustering scheme.
+
+## Three large steps
+
+### Average colors by nbit representation
+
+`pool_colors` will reduce 8-bit image colors (potentially 16_777_216 colors) to
+a maximum of 262_144 by averaging. The ouput of `pool_colors` will also contain
+a weight axis for each color, representing the combined opacity of all pixels
+of that color.
+
+
