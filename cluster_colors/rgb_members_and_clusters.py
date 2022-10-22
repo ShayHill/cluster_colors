@@ -101,6 +101,8 @@ class Member:
         Silently drop colors without weight. It is possible to return an empty set if
         no colors have weight > 0.
         """
+        # TODO: only accept stacked colors
+        return {Member(color) for color in colors if color[3] > 0}
         # TODO: delete commented-out code in Member.new_members
         # if isinstance(colors, np.ndarray):
             # colors = colors.reshape(-1, colors.shape[-1])
@@ -147,12 +149,21 @@ class Cluster:
 
     @functools.cached_property
     def weight(self) -> float:
-        # TODO: check is this is used
         """Get total weight of members.
 
         :return: total weight of members
         """
         return sum(member.w for member in self.members)
+    
+    @functools.cached_property
+    def quick_error(self) -> float:
+        """Product of max dimension and weight as a rough cost metric.
+
+        :return: product of max dimension and weight
+        """
+        rgbs = [member.rgb for member in self.members]
+        max_dim = max(np.ptp(rgbs, axis=0))
+        return max_dim * self.weight
 
     @functools.cached_property
     def exemplar(self) -> _RgbF:
