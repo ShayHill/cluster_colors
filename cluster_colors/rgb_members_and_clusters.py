@@ -59,6 +59,9 @@ class Member:
     @property
     def w(self) -> float:
         return self.rgbw[3]
+    
+    def __hash__(self) -> int:
+        return id(self)
 
     # @staticmethod
     # def _color_to_rgbw(color: Iterable[float]) -> _FourInts:
@@ -141,6 +144,7 @@ class Cluster:
         members: Iterable[Member],
         exemplar_age: int = 0,
     ) -> None:
+        assert members
         self.members = set(members)
         self.exemplar_age = exemplar_age
 
@@ -161,6 +165,8 @@ class Cluster:
 
         :return: product of max dimension and weight
         """
+        if len(self.members) == 1:
+            return 0.0
         rgbs = [member.rgb for member in self.members]
         max_dim = max(np.ptp(rgbs, axis=0))
         return max_dim * self.weight

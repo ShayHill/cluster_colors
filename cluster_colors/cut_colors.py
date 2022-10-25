@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 221022 14:01:46
+# last modified: 221023 09:52:32
 """Cluster colors with median cut.
 
 Repeatedly subdivide the color space by splitting along the longest axis (not
@@ -37,6 +37,8 @@ def _split_every_cluster(clusters: set[Cluster], max_num: int) -> set[Cluster]:
     for cluster in splittable:
         clusters.remove(cluster)
         clusters.update(cluster.split())
+    return _split_every_cluster(clusters, max_num)
+
 
 
 def _split_largest_cluster(clusters: set[Cluster], num: int) -> set[Cluster]:
@@ -47,15 +49,16 @@ def _split_largest_cluster(clusters: set[Cluster], num: int) -> set[Cluster]:
     """
     if len(clusters) >= num:
         return clusters
-    largest = max(clusters, key=attrgetter("quick_error"))
-    if largest.quick_error == 0:
+    max_error = max(c.quick_error for c in clusters)
+    if max_error == 0:
         return clusters
-    clusters.remove(largest)
-    clusters.update(largest.split())
-    return clusters
+    for cluster in [c for c in clusters if c.quick_error == max_error]:
+        clusters.remove(cluster)
+        clusters.update(cluster.split())
+    return _split_every_cluster(clusters, num)
 
 
-def split_colors(colors: StackedColors, num: int) -> StackedColors:
+def cut_colors(colors: StackedColors, num: int) -> StackedColors:
     """Merge colors into a set of num colors.
 
     :param colors: a (-1, 4) array of unique rgb values with weights
@@ -71,11 +74,22 @@ def split_colors(colors: StackedColors, num: int) -> StackedColors:
     """
     clusters = {Cluster(Member.new_members(colors))}
     clusters = _split_every_cluster(clusters, num // 2)
-
-    # now that clusters have been sufficients and somewhat uniformly split up, switch
-    # to a "nicer" splitting method for the rest of the splits.
     while len(clusters) < num:
         if not any(len(c.members) > 1 for c in clusters):
             break
         clusters = _split_largest_cluster(clusters, num)
     return np.array([c.as_member for c in clusters])
+
+def time_cut_colors():
+    """Time the cut_colors function."""
+    from cluster_colors import stack_colors
+    from cluster_colors import pool_colors
+    import time
+    start = time.time()
+    colors = np.random.randint(0, 255, (100_000, 3), dtype=np.uint8)
+    colors = pool_colors.pool_colors(colors)
+    aaa = cut_colors(colors, 512)
+    print (time.time() - start)
+
+if __name__ == "__main__":
+    time_cut_colors()
