@@ -16,14 +16,13 @@ from __future__ import annotations
 import functools
 import itertools
 import math
-from contextlib import suppress
 from operator import attrgetter, itemgetter
-from typing import Annotated, Any, Callable, Iterable, Optional, TypeAlias, TypeVar
+from typing import Annotated, Iterable, Optional, TypeAlias, TypeVar
 
 import numpy as np
 import numpy.typing as npt
 
-from cluster_colors.rgb_members_and_clusters import Cluster, Member, get_squared_error
+from cluster_colors.rgb_members_and_clusters import Cluster, Member
 
 _MAX_ITERATIONS = 1000
 
@@ -42,7 +41,7 @@ _ColorArray = (
 
 
 class _ErrorGetter:
-    """Call the cached methods in _Cluster with cluster instances as arguments."""
+    """Call the cached methods in Cluster with cluster instances as arguments."""
 
     @staticmethod
     def get_half_exemplar_span(cluster_a: Cluster, cluster_b: Cluster) -> float:
@@ -52,7 +51,7 @@ class _ErrorGetter:
     @staticmethod
     def get_member_error(member: Member, cluster: Cluster) -> float:
         """What is the cost for having member in cluster?"""
-        return cluster.get_squared_error(member.rgb)
+        return cluster.get_squared_error(member.vs)
 
 
 class _ClusterSplitter(_ErrorGetter):
@@ -144,6 +143,8 @@ class _ClusterReassigner(_ErrorGetter):
 
     def _offer_members(self, cluster: Cluster) -> None:
         """Look for another cluster with lower cost for members of input cluster."""
+        if len(cluster.members) == 1:
+            return
         if cluster.exemplar_age == 0:
             others = self.clusters - {cluster}
         else:
@@ -303,7 +304,6 @@ def get_biggest_color(
 if __name__ == "__main__":
     # open image, convert to array, and pass color array to get_biggest_color
     from PIL import Image
-    from PIL.Image import MAXCOVERAGE, FASTOCTREE
 
     img = Image.open("sugar-shack-barnes.jpg")
     img.quantize(256)

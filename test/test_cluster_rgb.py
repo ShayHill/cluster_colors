@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-# last modified: 221001 16:24:56
+# last modified: 221026 20:56:44
 """Test functions in triangulate_image.cluster_rgb.py
 
 :author: Shay Hill
 :created: 2022-09-16
 """
-from typing import cast
 
 import numpy as np
-import numpy.testing as npt
 import numpy.typing as npt
 import pytest
 from PIL import Image
@@ -16,6 +14,7 @@ from PIL import Image
 # pyright: reportPrivateUsage=false
 import cluster_colors.rgb_members_and_clusters
 from cluster_colors import cluster_rgb
+from cluster_colors.stack_colors import stack_colors
 
 
 @pytest.fixture
@@ -26,29 +25,16 @@ def thin_cluster() -> cluster_colors.rgb_members_and_clusters.Cluster:
     return cluster_colors.rgb_members_and_clusters.Cluster(members)
 
 
-@pytest.fixture(scope="module")
-def quantized_pixels() -> npt.NDArray[np.uint8]:
-    """Image test/sugar-shack-barnes.jpg quantized to 256 colors."""
-    return np.array(Image.open("sugar-shack-barnes.jpg").quantize(256))
-
-
 class TestMemberNewMembers:
     """Test Member.new_members."""
 
-    def test_one_member_per_color(self, quantized_pixels) -> None:
-        """Return one member per unique color"""
-        members = cluster_rgb.Member.new_members(quantized_pixels)
-        assert len(members) == 256
+    def test_one_member_per_color(self) -> None:
+        """Return 256 members given 256 colors."""
+        colors = stack_colors(np.random.randint(1, 256, (256, 4), dtype=np.uint8))
+        members = cluster_rgb.Member.new_members(colors)
+        assert len(members) == len(colors)
 
 
-# class TestMemberAs2Bit:
-# """Test triangulate_image._Member.as_2bit property"""
-
-# def test_as_2bit(self) -> None:
-# """Values are bit-shifted from 8-bit to 2-bit"""
-# assert cluster_colors.rgb_members_and_clusters.Member((0, 0, 0), 255).as_2bit == (0, 0, 0)
-# assert cluster_colors.rgb_members_and_clusters.Member((255, 255, 255), 255).as_2bit == (3, 3, 3)
-# assert cluster_colors.rgb_members_and_clusters.Member((127, 128, 128), 255).as_2bit == (1, 2, 2)
 
 
 # class TestMemberColorToRgbw:

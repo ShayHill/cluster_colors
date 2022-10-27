@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 221018 19:00:27
+# last modified: 221025 18:43:00
 """Test the stack_vectors module.
 
 :author: Shay Hill
@@ -50,7 +50,7 @@ class TestAddWeightAxis:
         assert output.dtype == np.float64
 
 
-class TestStackUniqueVectors:
+class TestStackVectors:
     def test_stack_unique_vectors(self):
         """Test the stack_unique_vectors method."""
         np.testing.assert_array_equal(
@@ -61,11 +61,11 @@ class TestStackUniqueVectors:
     def test_uint8_input_returns_floats_in_output(self):
         """Test the stack_unique_vectors method returns floats for uint8 input."""
         output = sv.stack_vectors(
-            np.array([[1, 2, 3, 55], [4, 5, 6, 5], [1, 2, 3, 45]], dtype=np.uint8)  # type: ignore
+            np.array([[1, 2, 3, 55], [4, 5, 6, 5], [1, 2, 3, 45]], dtype=np.uint8)
         )
         assert output.dtype == np.float64
 
-    def test_stack_unique_vectors_does_not_alter_input(self):
+    def test_stack_vectors_does_not_alter_input(self):
         """Test the stack_unique_vectors method does not alter input."""
         input_array = np.array([[1, 2, 3, 55], [4, 5, 6, 5], [1, 2, 3, 45]])
         _ = sv.stack_vectors(input_array)
@@ -82,4 +82,27 @@ class TestStackUniqueVectors:
                 weight=128,
             ),
             np.array([[1, 2, 3, 256], [4, 5, 6, 128]]),
+        )
+
+
+class TestStackColors:
+    def test_stack_colors_3(self):
+        """Test the stack_colors method on 3-axis vectors."""
+        np.testing.assert_array_equal(
+            sv.stack_colors(np.array([[1, 2, 3], [4, 5, 6], [1, 2, 3]])),
+            np.array([[1, 2, 3, 510], [4, 5, 6, 255]]),
+        )
+
+    def test_stack_colors_4(self):
+        """Test the stack_colors method on 4-axis vectors."""
+        np.testing.assert_array_equal(
+            sv.stack_colors(np.array([[1, 2, 3, 55], [4, 5, 6, 5], [1, 2, 3, 45]])),
+            np.array([[1, 2, 3, 100], [4, 5, 6, 5]]),
+        )
+
+    def test_stack_colors_1(self):
+        """Test the stack_colors method on 1-axis vectors."""
+        np.testing.assert_array_equal(
+            sv.stack_colors(np.array([[1], [4], [1]])),
+            np.array([[1, 510], [4, 255]]),
         )

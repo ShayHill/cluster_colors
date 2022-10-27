@@ -7,6 +7,8 @@ name = "pypi"
 numpy = "*"
 pillow = "*"
 wquantiles = "*"
+cython = "*"
+pandas = "*"
 
 [dev-packages]
 pytest = "*"

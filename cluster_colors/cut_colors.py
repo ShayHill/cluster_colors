@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 221023 09:52:32
+# last modified: 221026 14:20:31
 """Cluster colors with median cut.
 
 Repeatedly subdivide the color space by splitting along the longest axis (not
@@ -40,7 +40,6 @@ def _split_every_cluster(clusters: set[Cluster], max_num: int) -> set[Cluster]:
     return _split_every_cluster(clusters, max_num)
 
 
-
 def _split_largest_cluster(clusters: set[Cluster], num: int) -> set[Cluster]:
     """Split one cluster per call.
 
@@ -67,7 +66,7 @@ def cut_colors(colors: StackedColors, num: int) -> StackedColors:
 
     Put all colors into one cluster, split that cluster into num clusters, then
     return a median color for each cluster.
-    
+
     Splits every cluster until roughly half the requested number of clusters have
     been created, then starts cherry picking. This idea was proposed and tested in a
     paper I ran into online, but I can't find it now.
@@ -79,17 +78,3 @@ def cut_colors(colors: StackedColors, num: int) -> StackedColors:
             break
         clusters = _split_largest_cluster(clusters, num)
     return np.array([c.as_member for c in clusters])
-
-def time_cut_colors():
-    """Time the cut_colors function."""
-    from cluster_colors import stack_colors
-    from cluster_colors import pool_colors
-    import time
-    start = time.time()
-    colors = np.random.randint(0, 255, (100_000, 3), dtype=np.uint8)
-    colors = pool_colors.pool_colors(colors)
-    aaa = cut_colors(colors, 512)
-    print (time.time() - start)
-
-if __name__ == "__main__":
-    time_cut_colors()

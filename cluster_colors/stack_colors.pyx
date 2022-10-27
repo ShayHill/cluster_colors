@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 221026 10:35:24
+# last modified: 221026 12:22:13
 """Add and manipulate a vector weight axis.
 
 This project is built around combining identical vectors (presumably colors) into
@@ -28,12 +28,23 @@ what we want (so we can identify and address it outside the module).
 from typing import Annotated, Any, Optional
 
 import numpy as np
+cimport numpy as np
 from numpy import typing as npt
+
+import cython
+cimport cython
+from libc.stdlib cimport malloc, free
+import pandas as pd
 
 from cluster_colors.type_hints import FPArray, Pixels, StackedColors
 
+cdef int weight
+cdef int vector_length
+cdef int w
+cdef int i
 
-def add_weight_axis(vectors: npt.NDArray[Any], weight: float = 255.0) -> FPArray:
+
+def add_weight_axis(vectors, weight=0) -> FPArray:
     """Add a weight axis to a vector of vectors.
 
     :param vectors: A vector of vectors with shape (..., n).
@@ -48,13 +59,14 @@ def add_weight_axis(vectors: npt.NDArray[Any], weight: float = 255.0) -> FPArray
     more intuitive value in that case, as a vector with v[-1] == n would be a vector
     with n instances.
     """
+    # cdef np.ndarray[np.int_t] vectors
     assert weight > 0, "Weight must be greater than 0."
     ws = np.full(vectors.shape[:-1] + (1,), weight)
-    return np.append(vectors, ws, axis=-1).astype(float)  # type: ignore
+    return np.append(vectors, ws, axis=-1).astype(int)  # type: ignore
 
 
 def stack_vectors(
-    vectors: npt.NDArray[np.number[Any]], weight: Optional[float] = None
+    np.ndarray[np.int_t, ndim=2] flat_vectors
 ) -> Annotated[FPArray, (-1, -1)]:
     """Find and count unique vectors.
 
@@ -64,19 +76,25 @@ def stack_vectors(
     :return: unique (by v[:-1]) with
         v[-1] equal to the sum of all v[-1] where v[:-1] == v[:-1]
     """
-    if weight is not None:
-        vectors = add_weight_axis(vectors, weight)
+    # cdef np.ndarray[np.int_t] weighted_vectors
+    # cdef np.ndarray[np.int_t, ndim=2] flat_vectors
+    cdef np.ndarray[np.int_t, ndim=2] unique_vectors
+    cdef np.ndarray[np.int_t, ndim=1] where_seen
+    cdef np.ndarray[np.int_t, ndim=1] sum_weights
+    cdef np.ndarray[np.int_t, ndim=2] weights
+    cdef np.ndarray[np.int_t, ndim=2] vs
+    cdef np.ndarray[np.int_t, ndim=2] ws
+    cdef int i
+    cdef int weight
+    
+    vs, ws = np.split(flat_vectors, [-1], axis=-1)
+    unique_vectors, where_seen = np.unique(vs, return_inverse=True, axis=0)
+    sum_weights = np.zeros(unique_vectors.shape[0], dtype=int)
+    for i, w in zip(where_seen, ws):
+        sum_weights[i] += w
 
-    flat_vectors = vectors.reshape(-1, vectors.shape[-1]).astype(float)
-
-    unique_vectors, where_seen = np.unique(  # type: ignore
-        flat_vectors[:, :-1], return_inverse=True, axis=0
-    )
-    idx2seen = [0.0] * len(unique_vectors)
-    for i, idx in enumerate(where_seen):
-        idx2seen[idx] += flat_vectors[i, -1]
-    weights = np.array(idx2seen).reshape(-1, 1)
-    return np.append(unique_vectors, weights, axis=-1)  # type: ignore
+    weights = np.array(sum_weights).reshape(-1, 1)
+    return np.append(unique_vectors, sum_weights.reshape(-1, 1), axis=-1)  # type: ignore
 
 
 def stack_colors(colors: Pixels) -> StackedColors:
@@ -91,16 +109,23 @@ def stack_colors(colors: Pixels) -> StackedColors:
     Assumes one-channel vectors are opaque, 8-bit greyscal colors
         and adds a weight of 255.
     """
+    aaa = np.asarray(colors, dtype=int).reshape(-1, colors.shape[-1])
+    return stack_vectors(aaa)
+
+    cdef np.ndarray[np.int_t, ndim=2] flat_colors
+
     vector_length = colors.shape[-1]
+    flat_colors = colors.astype(int).reshape(-1, colors.shape[-1])
     if vector_length == 4:
-        return stack_vectors(colors)
+        return stack_vectors(flat_colors)
     elif vector_length == 3:
-        return stack_vectors(colors, 255.0)
+        flat_colors = add_weight_axis(flat_colors, 255)
+        return stack_vectors(flat_colors)
     elif vector_length == 1:
-        return stack_vectors(colors, 255.0)
+        flat_colors = add_weight_axis(flat_colors, 255)
+        return stack_vectors(flat_colors)
     else:
         raise ValueError(
             f"Expected colors to have shape (..., 1), (..., 3) or (..., 4), "
-            f"but got {colors.shape}."
+            f"but got {vector_length}."
         )
-    return stacked

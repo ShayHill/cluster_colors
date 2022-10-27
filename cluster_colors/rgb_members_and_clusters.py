@@ -3,13 +3,16 @@ from __future__ import annotations
 import functools
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Annotated, Any, DefaultDict, Iterable, TypeAlias, cast, Sequence
+from typing import Annotated, Any, DefaultDict, Iterable, Optional, TypeAlias, cast, \
+    Sequence
 
 import numpy as np
 from numpy import cov as np_cov  # type: ignore
 from numpy import typing as npt
 
 from cluster_colors.stacked_quantile import get_stacked_median, get_stacked_medians
+from cluster_colors.bbox import BBox
+from cluster_colors.type_hints import FPArray
 
 np_cov = cast(Any, np_cov)
 
@@ -49,17 +52,17 @@ class Member:
     colors weighing less.
     """
 
-    rgbw: Annotated[_FPArray, 4]
+    as_array: Annotated[_FPArray, 4]
 
     @property
-    def rgb(self) -> _RgbF:
-        r, g, b = self.rgbw[:3]
+    def vs(self) -> _RgbF:
+        r, g, b = self.as_array[:3]
         return r, g, b
 
     @property
     def w(self) -> float:
-        return self.rgbw[3]
-    
+        return self.as_array[3]
+
     def __hash__(self) -> int:
         return id(self)
 
@@ -105,7 +108,7 @@ class Member:
         no colors have weight > 0.
         """
         # TODO: only accept stacked colors
-        return {Member(color) for color in colors if color[3] > 0}
+        return {Member(color) for color in colors if color[-1] > 0}
         # TODO: delete commented-out code in Member.new_members
         # if isinstance(colors, np.ndarray):
             # colors = colors.reshape(-1, colors.shape[-1])
@@ -139,11 +142,7 @@ class Cluster:
     mutable.
     """
 
-    def __init__(
-        self,
-        members: Iterable[Member],
-        exemplar_age: int = 0,
-    ) -> None:
+    def __init__(self, members: Iterable[Member], exemplar_age: int = 0) -> None:
         assert members
         self.members = set(members)
         self.exemplar_age = exemplar_age
@@ -158,7 +157,17 @@ class Cluster:
         :return: total weight of members
         """
         return sum(member.w for member in self.members)
-    
+
+    @functools.cached_property
+    def bbox(self) -> Optional[BBox]:
+        """Get bounding box of members.
+
+        :return: bounding box of members
+        """
+        if len(members) == 1:
+            return None
+        return BBox.maybe_vector_bbox(self.as_array[:, :-1])
+
     @functools.cached_property
     def quick_error(self) -> float:
         """Product of max dimension and weight as a rough cost metric.
@@ -167,9 +176,7 @@ class Cluster:
         """
         if len(self.members) == 1:
             return 0.0
-        rgbs = [member.rgb for member in self.members]
-        max_dim = max(np.ptp(rgbs, axis=0))
-        return max_dim * self.weight
+        return max(self.bbox.dims) * self.weight
 
     @functools.cached_property
     def exemplar(self) -> _RgbF:
@@ -179,17 +186,23 @@ class Cluster:
 
         The exemplar property is lazy, so reset it by setting self._exemplar to None.
         """
-        members_array = np.array([member.rgbw for member in self.members])
+        members_array = np.array([member.as_array for member in self.members])
         colors, weights = members_array[:, :3], members_array[:, 3:]
         return tuple(get_stacked_medians(colors, weights))
 
-    @functools.cached_property
+    @property
     def as_member(self) -> Member:
         """Get cluster as a Member instance.
 
         :return: Member instance with rgb and weight of exemplar
         """
         return Member(np.array(self.exemplar + (self.weight,)))
+
+    @property
+    def as_array(self) -> _FPArray:
+        """Cluster as an array of member arrays.
+        """
+        return np.array([member.as_array for member in self.members])
 
     @functools.cached_property
     def _axis_of_highest_variance(self) -> npt.NDArray[np.floating[Any]]:
@@ -201,7 +214,7 @@ class Cluster:
         worrying about. There may be other cases where this breaks (silently makes a
         suboptimal split) but I haven't found them yet.
         """
-        members_array = np.array([member.rgbw for member in self.members])
+        members_array = np.array([member.as_array for member in self.members])
         colors, weights = members_array[:, :3], members_array[:, 3]
         covariance_matrix: _FPArray = np_cov(colors.T, aweights=weights)
         return np.linalg.eig(covariance_matrix)[1][0]
@@ -222,24 +235,25 @@ class Cluster:
         if len(self.members) == 2:
             a, b = self.members
             return {Cluster([a]), Cluster([b])}
+
         abc = self._axis_of_highest_variance
 
         def get_rel_dist(rgb: _RgbF) -> float:
             """Get relative distance of rgb from plane Ax + By + Cz + 0."""
             return float(np.dot(abc, rgb))  # type: ignore
 
-        scored = [(get_rel_dist(member.rgb), member) for member in self.members]
+        scored = [(get_rel_dist(member.vs), member) for member in self.members]
         median_score = get_stacked_median(
             [s for s, _ in scored], [m.w for _, m in scored]
         )
         left = {m for s, m in scored if s < median_score}
+        scored -= left
         right = {m for s, m in scored if s > median_score}
-        left_weight = sum(m.w for m in left)
-        right_weight = sum(m.w for m in right)
-        if right_weight < left_weight:
-            right |= {m for s, m in scored if s == median_score}
+        scored -= right
+        if scored and sum(m.w for m in left) < sum(m.w for m in right):
+            left |= scored
         else:
-            left |= {m for s, m in scored if s == median_score}
+            right |= scored
         return {Cluster(left), Cluster(right)}
 
     @functools.cache
@@ -268,7 +282,7 @@ class Cluster:
         :return: sum of squared errors of all members
         """
         return sum(
-            self.get_squared_error(member.rgb) * member.w for member in self.members
+            self.get_squared_error(member.vs) * member.w for member in self.members
         )
 
     def process_queue(self) -> Cluster:
@@ -278,3 +292,6 @@ class Cluster:
         else:
             self.exemplar_age += 1
             return self
+
+
+
