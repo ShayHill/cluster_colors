@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 221026 20:50:37
+# last modified: 221027 12:52:30
 """Simple BBox class
 
 Create a square bounding sphere around a set of points.
@@ -92,5 +92,34 @@ class BBox:
         maxs = np.minimum(self.maxs, other.maxs)
         return BBox(mins, maxs)
 
+    def point_intersection(self, point: FPArray) -> BBox:
+        """Intersection of self and a BBox instance of the same dims centered on point.
+
+        The box returned will be the region potentially shared by 
+        """
+        if self._is_degenerate:
+            return BBox()
+        mins = point - self.dims / 2
+        maxs = point + self.dims / 2
+        other_bbox = BBox(mins, maxs)
+        return self.intersection(other_bbox)
+
+
     def intersects(self, other: BBox) -> bool:
         return not self.intersection(other)._is_degenerate
+
+class BoundingSphere:
+    def __init__(self, center: FPArray, radius: float) -> None:
+        self.center = center
+        self.radius = radius
+
+    def __contains__(self, vector: FPArray) -> bool:
+        """determine if a point lies within a sphere. do not use norm"""
+        return np.linalg.norm(vector - self.center) <= self.radius
+
+    def intersects(self, other: BoundingSphere) -> bool:
+        return np.linalg.norm(other.center - self.center) <= self.radius + other.radius
+
+    def intersection(self, other: BoundingSphere) -> BoundingSphere:
+        if not self.intersects(other):
+            return BoundingSphere(self.center, 0)

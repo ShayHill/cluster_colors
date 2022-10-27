@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 221001 16:12:25
+# last modified: 221027 13:09:23
 """Cluster RGB values, no optimization.
 
 Cluster into an indeterminate number of groups. Will be fine for a small number of
@@ -146,11 +146,25 @@ class _ClusterReassigner(_ErrorGetter):
         if len(cluster.members) == 1:
             return
         if cluster.exemplar_age == 0:
+            # new clusters can interract with all other clusters
             others = self.clusters - {cluster}
         else:
+            # old clusters can only interact with new clusters
             others = {x for x in self.clusters if x.exemplar_age == 0}
         if not others:
             return
+
+        # TODO: clean up bounding box code
+        # member2offers: dict[Member, tuple[Cluster, float]] = {}                               
+        # for other in others:
+            # bbox_intersection = cluster.bbox.intersection(other.bboxk
+            # if not bbox_intersection._is_degenerate:
+                # continue
+            # member2offers = {}
+            # for member in cluster.members:
+                # if member.vs in bbox_intersection and:
+                    # other.queue_add(member)
+                    # cluster.members.remove(member)
 
         safe_cost = self._get_safe_cost(cluster, others)
         for member in cluster.members:

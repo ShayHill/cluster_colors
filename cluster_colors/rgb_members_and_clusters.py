@@ -56,45 +56,14 @@ class Member:
 
     @property
     def vs(self) -> _RgbF:
-        r, g, b = self.as_array[:3]
-        return r, g, b
+        return tuple(self.as_array[:-1])
 
     @property
     def w(self) -> float:
-        return self.as_array[3]
+        return self.as_array[-1]
 
     def __hash__(self) -> int:
         return id(self)
-
-    # @staticmethod
-    # def _color_to_rgbw(color: Iterable[float]) -> _FourInts:
-        # """Add a weight of 255 to a 3-value vector. Infer weight for 4-value vector.
-
-        # :param color: rgb or rgba tuple
-        # :return: rwbw tuple
-        # :raises TypeError: if color cannot be cast to int without loss of precision
-        # :raises ValueError: if color is not in [0..255]
-        # :raises ValueError: if color is not a 3- or 4-tuple
-
-        # For an rgb tuple, the weight is 255.
-        # For an rgba tuple, the alpha value float subtracted from 255 to get the weight.
-
-            # >>> Member._color_to_rgbw((1, 2, 3))
-            # (1, 2, 3, 255)
-
-            # >>> Member._color_to_rgbw((1, 2, 3, 4))
-            # (1, 2, 3, 4)
-        # """
-        # color = tuple(color)
-        # if not all(0 <= x <= 255 for x in color[:3]):
-            # raise ValueError("color values must be in [0..255]")
-        # if any(x % 1 for x in color):
-            # raise TypeError("color values must castable to int without loss")
-        # if len(color) == 3:
-            # r, g, b = (int(x) for x in color)
-            # return (r, g, b, 255)
-        # elif len(color) != 4:
-            # raise ValueError(f"color must be 3 or 4 values, not {len(color)}")
 
     @classmethod
     def new_members(cls, colors: _ColorArray) -> set[Member]:
@@ -107,22 +76,7 @@ class Member:
         Silently drop colors without weight. It is possible to return an empty set if
         no colors have weight > 0.
         """
-        # TODO: only accept stacked colors
         return {Member(color) for color in colors if color[-1] > 0}
-        # TODO: delete commented-out code in Member.new_members
-        # if isinstance(colors, np.ndarray):
-            # colors = colors.reshape(-1, colors.shape[-1])
-        # rgbws = [cls._color_to_rgbw(color) for color in colors]
-
-        # if not all(x[3] >= 0 for x in rgbws):
-            # raise ValueError("color weights must be non-negative")
-
-        # rgbws = [x for x in rgbws if x[3] > 0]
-
-        # color2weight: DefaultDict[_RgbF, float] = defaultdict(float)
-        # for r, g, b, w in rgbws:
-            # color2weight[(r, g, b)] += w
-        # return {cls(np.array(k + (v,))) for k, v in color2weight.items()}
 
 
 class Cluster:
@@ -159,13 +113,11 @@ class Cluster:
         return sum(member.w for member in self.members)
 
     @functools.cached_property
-    def bbox(self) -> Optional[BBox]:
+    def bbox(self) -> BBox:
         """Get bounding box of members.
 
         :return: bounding box of members
         """
-        if len(members) == 1:
-            return None
         return BBox.maybe_vector_bbox(self.as_array[:, :-1])
 
     @functools.cached_property
@@ -215,7 +167,7 @@ class Cluster:
         suboptimal split) but I haven't found them yet.
         """
         members_array = np.array([member.as_array for member in self.members])
-        colors, weights = members_array[:, :3], members_array[:, 3]
+        colors, weights = members_array[:, :-1], members_array[:, -1]
         covariance_matrix: _FPArray = np_cov(colors.T, aweights=weights)
         return np.linalg.eig(covariance_matrix)[1][0]
 
@@ -247,13 +199,12 @@ class Cluster:
             [s for s, _ in scored], [m.w for _, m in scored]
         )
         left = {m for s, m in scored if s < median_score}
-        scored -= left
         right = {m for s, m in scored if s > median_score}
-        scored -= right
-        if scored and sum(m.w for m in left) < sum(m.w for m in right):
-            left |= scored
+        center = {m for s, m in scored if s == median_score}
+        if center and sum(m.w for m in left) < sum(m.w for m in right):
+            left |= center
         else:
-            right |= scored
+            right |= center
         return {Cluster(left), Cluster(right)}
 
     @functools.cache

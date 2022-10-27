@@ -12,6 +12,9 @@ pandas = "*"
 
 [dev-packages]
 pytest = "*"
+matplotlib = "*"
+pyqt5 = "*"
+tornado = "*"
 
 [requires]
 python_version = "3.10"
