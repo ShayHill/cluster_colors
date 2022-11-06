@@ -3,26 +3,37 @@ from __future__ import annotations
 import pickle
 from _operator import attrgetter
 from pathlib import Path
-from typing import Optional, Annotated, Any
+from typing import Optional
 
 import numpy as np
-import numpy.typing as npt
-from PIL import Image
 
-from cluster_colors.cluster_rgb import KMediansClusters
+from cluster_colors.kmedians import KMediansClusters
 from cluster_colors.cut_colors import cut_colors
 from cluster_colors.paths import PICKLE_DIR, TEST_DIR
 from cluster_colors.pool_colors import pool_colors
-from cluster_colors.stack_colors import stack_vectors
-from cluster_colors.type_hints import FPArray, Pixels
+from cluster_colors.stack_vectors import stack_vectors
+from cluster_colors.type_hints import FPArray, NBits, Pixels, StackedColors
 
 
-def stack_image_colors(filename: Path | str, num_colors:int =512, ignore_cache:bool=False) -> Annotated[npt.NDArray[np.floating[Any]], (-1, -1)]:
-    """Reduce the number of colors in an image.
+def stack_image_colors(
+    filename: Path | str,
+    num_colors: float = 512,
+    pool_bits: NBits = 6,
+    ignore_cache: bool = False,
+) -> StackedColors:
+    """Stack pixel colors and reduce the number of colors in an image.
 
     :param filename: the path to an image file
-    :param num_colors: the number of colors to reduce to
-    :return: a PIL Image object
+    :param num_colors: the number of colors to reduce to. The default of 512 will
+        cluster quickly down to medium-sized clusters.
+    :param pool_bits: the number of bits to pool colors by. The default of 6 is a
+    good value. You can probably just ignore this parameter, but it's here to
+        eliminate a "magic number" from the code.
+    :param ignore_cache: if True, ignore any cached results and recompute the colors.
+    :return: an array of colors with weights
+
+    This is a pre-processing step for the color clustering. Stacking is necessary,
+    and the pooling and cutting will allow clustering in a reasonable amount of time.
     """
     cache_path = PICKLE_DIR / f"{Path(filename).stem}-{num_colors}.pkl"
     if not ignore_cache and cache_path.exists():
@@ -32,7 +43,7 @@ def stack_image_colors(filename: Path | str, num_colors:int =512, ignore_cache:b
     img = Image.open(filename)
     img = img.convert("RGBA")
     colors = stack_vectors(np.array(img))
-    colors = pool_colors(colors, 6)
+    colors = pool_colors(colors, pool_bits)
     colors = cut_colors(colors, num_colors)
 
     # save the cache to PICKLE_DIR
@@ -42,15 +53,13 @@ def stack_image_colors(filename: Path | str, num_colors:int =512, ignore_cache:b
     return colors
 
 
-
-
-def _get_biggest_color(colors: Pixels, weight: Optional[float] = None) -> tuple[float, ...]:
+def get_biggest_color(stacked_colors: StackedColors) -> tuple[float, ...]:
     """Get the color with the highest weight."""
-    quarter_colorspace_se = 64 ** 2
-    clusters = _get_clusters(colors, weight)
+    quarter_colorspace_se = 64**2
+    clusters = KMediansClusters.from_stacked_vectors(stacked_colors)
     _ = clusters.split_to_se(quarter_colorspace_se)
     clusters.merge_to_find_winner()
-    winner = max(clusters, key=attrgetter("weight"))
+    winner = max(clusters, key=attrgetter("w"))
     return winner.exemplar
 
 
@@ -61,9 +70,9 @@ def image_from_array(arr):
 
 
 def temp_r(clusters):
-    return sum(x.sum_squared_error for x in clusters.clusters)
+    return sum(x.sse for x in clusters.clusters)
 
-    return x.sum_squared_error / (x._variance * len(x.members))
+    return x.sse / (x._variance * len(x.members))
 
 
 def display_clusters(clusters):
@@ -76,7 +85,7 @@ def display_clusters(clusters):
 
 def _show_palette(colors: Pixels, weight: Optional[float] = None) -> tuple[float, ...]:
     """Get the color with the highest weight."""
-    quarter_colorspace_se = 4 ** 2
+    quarter_colorspace_se = 4**2
     clusters = _get_clusters(colors, weight)
     _ = clusters.split_to_se(quarter_colorspace_se)
     arr = display_clusters(clusters)
@@ -101,18 +110,16 @@ def _get_base_colors(
     return colors
 
 
-def _get_clusters(stacked_colors: Pixels, weight: Optional[float] = None) -> KMediansClusters:
+# TODO: delete this if it's not used
+def _get_clusters( stacked_colors: StackedColors) -> KMediansClusters:
     """Create a KMediansClusters instance with one cluster holding all colors.
 
-    :param colors: an array of colors
-    :param weight: a single value to be applied to all colors. Colors with an alpha
-        channel will already have a weight, so the default of None will be
-        appropriate for colors without an alpha channel.
+    :param stacked_colors: an array of colors with weight axes
     :return: a KMediansClusters object
     """
-    # stacked_colors = _get_base_colors(colors, weight)
     clusters = KMediansClusters.from_stacked_vectors(stacked_colors)
     return clusters
+
 
 if __name__ == "__main__":
     # open image, convert to array, and pass color array to get_biggest_color
@@ -120,11 +127,12 @@ if __name__ == "__main__":
 
     # img = Image.open("test/sugar-shack-barnes.jpg")
     import time
+
     start = time.time()
     colors = stack_image_colors(TEST_DIR / "sugar-shack-barnes.jpg")
-    print(time.time()-start)
+    print(time.time() - start)
     # _show_palette(colors)
-    _get_biggest_color(colors)
+    get_biggest_color(colors)
     # try:
     # image = image.quantize(colors=count_colors, method=MAXCOVERAGE)
     # except ValueError:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 221026 13:52:26
+# last modified: 221106 16:41:03
 """Test reduce_colors() function.
 
 :author: Shay Hill
@@ -18,7 +18,7 @@ import numpy as np
 from PIL import Image
 
 from cluster_colors import pool_colors
-from cluster_colors.stack_colors import stack_colors
+from cluster_colors.stack_vectors import stack_vectors
 from cluster_colors.paths import TEST_DIR
 
 _T = TypeVar("_T")
@@ -40,7 +40,7 @@ class TestPoolColors:
         """Order of colors should not matter."""
         img = Image.open(TEST_DIR / "sugar-shack-barnes.jpg")
         colors = np.array(img)
-        stacked_colors = stack_colors(colors)
+        stacked_colors = stack_vectors(colors)
         reduced = {tuple(x) for x in pool_colors.pool_colors(stacked_colors, 4)}
         reduced2 = {tuple(x) for x in pool_colors.pool_colors(stacked_colors[::-1], 4)}
         assert reduced == reduced2
@@ -49,9 +49,7 @@ class TestPoolColors:
         """Single color should be returned."""
         img = Image.open(TEST_DIR / "sugar-shack-barnes.jpg")
         colors = np.array(img).reshape(-1, 1)
-        stacked_colors = stack_colors(colors)
+        stacked_colors = stack_vectors(colors)
         reduced = {tuple(x) for x in pool_colors.pool_colors(stacked_colors, 4)}
         reduced2 = {tuple(x) for x in pool_colors.pool_colors(stacked_colors[::-1], 4)}
         assert reduced == reduced2
-
-

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-# last modified: 221028 15:44:36
+# last modified: 221106 09:57:38
 """Type hints for cluster_colors.
 
 :author: Shay Hill
 :created: 2022-10-22
 """
 
-from typing import Annotated, Any, TypeAlias
+from typing import Annotated, Any, Literal, TypeAlias
 
 import numpy as np
 from numpy import typing as npt
@@ -20,3 +20,6 @@ StackedColors: TypeAlias = Annotated[npt.NDArray[np.floating[Any]], (-1, 4)]
 # array that has been cast to float, but it not expected to have a weight axis or
 # particular shape.
 FPArray: TypeAlias = npt.NDArray[np.floating[Any]]
+    
+# number of bits in a color channel
+NBits = Literal[1, 2, 3, 4, 5, 6, 7, 8]

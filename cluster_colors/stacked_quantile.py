@@ -39,6 +39,7 @@ from typing import Any, TypeAlias, cast, Iterable
 import numpy as np
 import numpy.typing as npt
 
+# TODO: refactor _FPArray to type_hints.FPArray
 _FPArray: TypeAlias = npt.NDArray[np.floating[Any]]
 
 

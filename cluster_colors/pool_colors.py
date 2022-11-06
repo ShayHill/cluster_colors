@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 221026 13:54:06
+# last modified: 221106 16:46:43
 """Reduce colors by averaging colors with the same n-bit representation.
 
 A reasonable and deterministic way to reduce 24-bit colors (8 bits per channel,
@@ -16,16 +16,14 @@ they shouldn't have more than 256 unique values.
 :created: 2022-09-19
 """
 
-from typing import Annotated, Literal, Sequence, Callable
 from itertools import chain, repeat
+from typing import Annotated, Callable, Literal, Sequence
 
 import numpy as np
 
-from cluster_colors.stack_colors import stack_colors
-from cluster_colors.type_hints import FPArray, Pixels
+from cluster_colors.type_hints import FPArray, NBits, Pixels
 
 _8BitCube = Annotated[FPArray, (256, 256, 256, ...)]
-_NBits = Literal[1, 2, 3, 4, 5, 6, 7, 8]
 _FReduce = Callable[[FPArray, tuple[int]], FPArray]
 
 
@@ -42,8 +40,8 @@ def _pool(matrix: FPArray, kernel_shape: tuple[int], func: _FReduce) -> FPArray:
     """
     assert all(v % k == 0 for v, k in zip(matrix.shape, kernel_shape))
 
-    matrix_shape = matrix.shape[:len(kernel_shape)]
-    vector_shape = matrix.shape[len(kernel_shape):]
+    matrix_shape = matrix.shape[: len(kernel_shape)]
+    vector_shape = matrix.shape[len(kernel_shape) :]
     folded_dims = [(v // k, k) for v, k in zip(matrix_shape, kernel_shape)]
     pools_shape = tuple(chain(*folded_dims))
     reshaped = matrix.reshape(pools_shape + vector_shape)
@@ -51,7 +49,7 @@ def _pool(matrix: FPArray, kernel_shape: tuple[int], func: _FReduce) -> FPArray:
     return func(reshaped, axis=tuple(range(len(pools_shape)))[1::-1])
 
 
-def _pool_8bit_cube(colors: _8BitCube, nbits: _NBits) -> FPArray:
+def _pool_8bit_cube(colors: _8BitCube, nbits: NBits) -> FPArray:
     """Sum values by n-bit representation of their indices.
 
     :param colors: array of colors, with shape (256, 256, 256, 4)
@@ -63,7 +61,7 @@ def _pool_8bit_cube(colors: _8BitCube, nbits: _NBits) -> FPArray:
     return _pool(colors, kernel_shape, np.sum)
 
 
-def pool_colors(colors: Pixels, nbits: _NBits = 6) -> FPArray:
+def pool_colors(colors: Pixels, nbits: NBits = 6) -> FPArray:
     """Reduce 8-bit colors (each with a weight) to a maximum of (2**nbits)**3 colors.
 
     :param colors: array of colors, with shape (..., 4)

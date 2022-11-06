@@ -21,63 +21,14 @@ from __future__ import annotations
 
 from copy import deepcopy
 from operator import itemgetter
-from typing import Iterable, Iterator
+from typing import Iterable
 
 import numpy as np
 
-from cluster_colors.distance_matrix import DistanceMatrix
-from cluster_colors.rgb_members_and_clusters import Cluster, Member, get_squared_error
+from cluster_colors.clusters import Cluster, Clusters, Member
 from cluster_colors.type_hints import FPArray
 
 _MAX_ITERATIONS = 1000
-
-def _get_cluster_squared_error(cluster_a: Cluster, cluster_b: Cluster) -> float:
-    """Get squared distance between two clusters.
-
-    :param cluster_a: Cluster
-    :param cluster_b: Cluster
-    :return: squared distance from cluster_a.exemplar to cluster_b.exemplar
-    """
-    return get_squared_error(cluster_a.exemplar, cluster_b.exemplar)
-
-
-class _Clusters:
-    """A set of Cluster instances with cached distances and queued updates.
-
-    Maintains a cached matrix of squared distances between all Cluster exemplars.
-    Created for K-medians which passes members around *before* updating exemplars, so
-    any changes identified must be staged in each Cluster's queue_add and queue_sub
-    sets then applied with _Clusters.process_queues.
-    """
-
-    def __init__(self, clusters: Iterable[Cluster]):
-        self._clusters: set[Cluster] = set()
-        self.spans: DistanceMatrix[Cluster]
-        self.spans = DistanceMatrix(_get_cluster_squared_error)
-        self.add(*clusters)
-
-
-
-    def __iter__(self) -> Iterator[Cluster]:
-        return iter(self._clusters)
-
-    def __len__(self) -> int:
-        return len(self._clusters)
-
-    def add(self, *cluster_args: Cluster) -> None:
-        for cluster in cluster_args:
-            self._clusters.add(cluster)
-            self.spans.add(cluster)
-
-    def remove(self, *cluster_args: Cluster) -> None:
-        for cluster in cluster_args:
-            self._clusters.remove(cluster)
-            self.spans.remove(cluster)
-
-    def process_queues(self) -> None:
-        processed = {c.process_queue() for c in self._clusters}
-        self.remove(*(self._clusters - processed))
-        self.add(*(processed - self._clusters))
 
 
 class _ClusterSplitter:
@@ -87,7 +38,7 @@ class _ClusterSplitter:
     along the axis of highest variance.
     """
 
-    def __init__(self, clusters: _Clusters):
+    def __init__(self, clusters: Clusters):
         self.clusters = clusters
 
     def __call__(self, min_error_to_split: float = 0) -> bool:
@@ -101,7 +52,7 @@ class _ClusterSplitter:
         candidates = [c for c in self.clusters if len(c.members) > 1]
         if not candidates:
             return False
-        graded = [(c.sum_squared_error, c) for c in candidates]
+        graded = [(c.sse, c) for c in candidates]
         max_error, cluster = max(graded, key=itemgetter(0))
         if max_error < min_error_to_split:
             return False
@@ -118,7 +69,7 @@ class _ClusterMerger:
     Remove these clusters and add a new cluster with their combined members.
     """
 
-    def __init__(self, clusters: _Clusters) -> None:
+    def __init__(self, clusters: Clusters) -> None:
         self.clusters = clusters
 
     def __call__(self, merge_below_cost: float = np.inf) -> bool:
@@ -143,7 +94,7 @@ class _ClusterMerger:
 class _ClusterReassigner:
     """Reassign members to the closest cluster exemplar."""
 
-    def __init__(self, clusters: _Clusters) -> None:
+    def __init__(self, clusters: Clusters) -> None:
         self.clusters = clusters
 
     def _get_others(self, cluster: Cluster) -> set[Cluster]:
@@ -206,7 +157,7 @@ class _ClusterReassigner:
         return True
 
 
-class KMediansClusters(_Clusters):
+class KMediansClusters(Clusters):
     def __init__(self, clusters: Iterable[Cluster]) -> None:
         super().__init__(clusters)
         self.splitter = _ClusterSplitter(self)
@@ -296,7 +247,7 @@ class KMediansClusters(_Clusters):
         """Is one cluster heavier than the rest?"""
         if len(self) == 1:
             return True
-        weights = [c.weight for c in self]
+        weights = [c.w for c in self]
         return weights.count(max(weights)) == 1
 
     def merge_to_find_winner(self) -> None:

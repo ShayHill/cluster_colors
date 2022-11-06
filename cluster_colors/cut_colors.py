@@ -18,7 +18,7 @@ from operator import attrgetter
 
 import numpy as np
 
-from cluster_colors.rgb_members_and_clusters import Cluster, Member
+from cluster_colors.clusters import Cluster, Member
 from cluster_colors.type_hints import StackedColors
 
 

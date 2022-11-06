@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import functools
 from dataclasses import dataclass
-from typing import Annotated, Any, Iterable, TypeAlias, cast, Sequence, Optional
+from typing import Annotated, Any, Iterable, Iterator, TypeAlias, cast, Sequence, \
+    Optional
 
 import numpy as np
 from numpy import cov as np_cov  # type: ignore
 from numpy import typing as npt
 
+from cluster_colors.distance_matrix import DistanceMatrix
 from cluster_colors.stacked_quantile import get_stacked_median, get_stacked_medians
 from cluster_colors.type_hints import FPArray
 
@@ -141,7 +143,7 @@ class Cluster:
     def _np_linalg_eig(self) -> tuple[FPArray, FPArray]:
         """Cache the value of np.linalf.eig on the covariance matrix of the cluster."""
         vss, ws = np.split(self.as_array, [-1], axis=1)
-        covariance_matrix: FPArray = np_cov(vss.T, aweights=ws)
+        covariance_matrix: FPArray = np_cov(vss.T, aweights=ws.flatten())
         return np.linalg.eig(covariance_matrix)
 
     @functools.cached_property
@@ -239,3 +241,52 @@ class Cluster:
         else:
             self.exemplar_age += 1
             return self
+
+
+def _get_cluster_squared_error(cluster_a: Cluster, cluster_b: Cluster) -> float:
+    """Get squared distance between two clusters.
+
+    :param cluster_a: Cluster
+    :param cluster_b: Cluster
+    :return: squared distance from cluster_a.exemplar to cluster_b.exemplar
+    """
+    return get_squared_error(cluster_a.exemplar, cluster_b.exemplar)
+
+
+class Clusters:
+    """A set of Cluster instances with cached distances and queued updates.
+
+    Maintains a cached matrix of squared distances between all Cluster exemplars.
+    Created for K-medians which passes members around *before* updating exemplars, so
+    any changes identified must be staged in each Cluster's queue_add and queue_sub
+    sets then applied with _Clusters.process_queues.
+    """
+
+    def __init__(self, clusters: Iterable[Cluster]):
+        self._clusters: set[Cluster] = set()
+        self.spans: DistanceMatrix[Cluster]
+        self.spans = DistanceMatrix(_get_cluster_squared_error)
+        self.add(*clusters)
+
+
+
+    def __iter__(self) -> Iterator[Cluster]:
+        return iter(self._clusters)
+
+    def __len__(self) -> int:
+        return len(self._clusters)
+
+    def add(self, *cluster_args: Cluster) -> None:
+        for cluster in cluster_args:
+            self._clusters.add(cluster)
+            self.spans.add(cluster)
+
+    def remove(self, *cluster_args: Cluster) -> None:
+        for cluster in cluster_args:
+            self._clusters.remove(cluster)
+            self.spans.remove(cluster)
+
+    def process_queues(self) -> None:
+        processed = {c.process_queue() for c in self._clusters}
+        self.remove(*(self._clusters - processed))
+        self.add(*(processed - self._clusters))

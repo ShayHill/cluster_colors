@@ -77,31 +77,3 @@ def stack_vectors(
         idx2seen[idx] += flat_vectors[i, -1]
     weights = np.array(idx2seen).reshape(-1, 1)
     return np.append(unique_vectors, weights, axis=-1)  # type: ignore
-
-
-# TODO: factor out stack colors
-def stack_colors(colors: Pixels) -> StackedColors:
-    """Call stack_vectors with some inferences.
-
-    :param colors: array of colors, with shape (..., 1), (..., 3) or (..., 4)
-    :return: array of stacked colors, with shape (n, 4)
-    :raises ValueError: if colors do not have shape (..., 1), (..., 3) or (..., 4)
-
-    Assumes four-channel colors already have a weight in the rourth channel.
-    Assumes three-channel vectors are opaque, 8-bit colors and adds a weight of 255.
-    Assumes one-channel vectors are opaque, 8-bit greyscal colors
-        and adds a weight of 255.
-    """
-    vector_length = colors.shape[-1]
-    if vector_length == 4:
-        return stack_vectors(colors)
-    elif vector_length == 3:
-        return stack_vectors(colors, 255.0)
-    elif vector_length == 1:
-        return stack_vectors(colors, 255.0)
-    else:
-        raise ValueError(
-            f"Expected colors to have shape (..., 1), (..., 3) or (..., 4), "
-            f"but got {colors.shape}."
-        )
-    return stacked

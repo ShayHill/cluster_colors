@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# last modified: 221027 14:38:25
-"""Test functions in triangulate_image.cluster_rgb.py
+# last modified: 221106 16:39:54
+"""Test functions in triangulate_image.kmedians.py
 
 :author: Shay Hill
 :created: 2022-09-16
@@ -13,14 +13,13 @@ from PIL import Image
 
 from typing import Iterable
 # pyright: reportPrivateUsage=false
-import cluster_colors.rgb_members_and_clusters
-from cluster_colors.rgb_members_and_clusters import Cluster, Member
-from cluster_colors import cluster_rgb
-from cluster_colors.stack_colors import stack_vectors, add_weight_axis
-from cluster_colors.stack_colors import stack_colors
+import cluster_colors.clusters
+from cluster_colors.clusters import Cluster, Member
+from cluster_colors import kmedians
+from cluster_colors.stack_vectors import stack_vectors, add_weight_axis
 from cluster_colors.paths import TEST_DIR
 from cluster_colors.type_hints import FPArray
-from cluster_colors import cluster_rgb
+from cluster_colors import kmedians
 from matplotlib import pyplot as plt
 import matplotlib
 matplotlib.use('WebAgg')
@@ -40,8 +39,8 @@ class TestMemberNewMembers:
 
     def test_one_member_per_color(self) -> None:
         """Return 256 members given 256 colors."""
-        colors = stack_colors(np.random.randint(1, 256, (256, 4), dtype=np.uint8))
-        members = cluster_rgb.Member.new_members(colors)
+        colors = stack_vectors(np.random.randint(1, 256, (256, 4), dtype=np.uint8))
+        members = kmedians.Member.new_members(colors)
         assert len(members) == len(colors)
 
 
@@ -69,7 +68,7 @@ class TestCallers:
     def test_get_cluster_tuple(self) -> None:
         """Return exemplar and members for a cluster."""
         colors = np.array([[x, x, x, x] for x in range(1, 10)])
-        members = Member.new_members(colors)  
+        members = Member.new_members(colors)
         cluster = Cluster(members)
         exemplar, members = cluster_rgb._get_cluster_tuple(cluster)
         assert exemplar == (7, 7, 7)
@@ -83,10 +82,10 @@ def show_clusters(clusters: Iterable[Cluster]) -> None:
     Make each cluster a different color.
     """
     colors = plt.cm.rainbow(np.linspace(0, 1, len(clusters)))  # type: ignore
-    colors = stack_colors(colors)  # type: ignore
-    for cluster, color in zip(clusters, colors): 
-        points = cluster.as_array[:, :2]  
-        x, y = zip(*points)  
+    colors = stack_vectors(colors)  # type: ignore
+    for cluster, color in zip(clusters, colors):
+        points = cluster.as_array[:, :2]
+        x, y = zip(*points)
         plt.scatter(x, y, color=color)  # type: ignore
     plt.show()  # type: ignore
 
