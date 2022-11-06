@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 221026 14:20:31
+# last modified: 221028 15:58:08
 """Cluster colors with median cut.
 
 Repeatedly subdivide the color space by splitting along the longest axis (not
@@ -71,10 +71,12 @@ def cut_colors(colors: StackedColors, num: int) -> StackedColors:
     been created, then starts cherry picking. This idea was proposed and tested in a
     paper I ran into online, but I can't find it now.
     """
+    if len(colors) <= num:
+        return colors
     clusters = {Cluster(Member.new_members(colors))}
     clusters = _split_every_cluster(clusters, num // 2)
     while len(clusters) < num:
         if not any(len(c.members) > 1 for c in clusters):
             break
         clusters = _split_largest_cluster(clusters, num)
-    return np.array([c.as_member for c in clusters])
+    return np.array([c.as_member.as_array for c in clusters])

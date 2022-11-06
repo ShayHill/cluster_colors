@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 221026 10:35:24
+# last modified: 221028 15:53:59
 """Add and manipulate a vector weight axis.
 
 This project is built around combining identical vectors (presumably colors) into
@@ -79,6 +79,7 @@ def stack_vectors(
     return np.append(unique_vectors, weights, axis=-1)  # type: ignore
 
 
+# TODO: factor out stack colors
 def stack_colors(colors: Pixels) -> StackedColors:
     """Call stack_vectors with some inferences.
 

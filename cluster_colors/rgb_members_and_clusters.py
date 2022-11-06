@@ -1,17 +1,14 @@
 from __future__ import annotations
 
 import functools
-from collections import defaultdict
 from dataclasses import dataclass
-from typing import Annotated, Any, DefaultDict, Iterable, Optional, TypeAlias, cast, \
-    Sequence
+from typing import Annotated, Any, Iterable, TypeAlias, cast, Sequence, Optional
 
 import numpy as np
 from numpy import cov as np_cov  # type: ignore
 from numpy import typing as npt
 
 from cluster_colors.stacked_quantile import get_stacked_median, get_stacked_medians
-from cluster_colors.bbox import BBox
 from cluster_colors.type_hints import FPArray
 
 np_cov = cast(Any, np_cov)
@@ -31,9 +28,7 @@ _ColorArray = (
 def get_squared_error(color_a: _RgbF, color_b: _RgbF) -> float:
     """Get squared distance between two colors.
 
-    :param color_a: rgb tuple
-    :param color_b: rgb tuple
-    :return: squared distance from color_a to color_b
+    return: squared distance from color_a to color_b
     """
     squared_error: np.floating[Any] = np.sum(np.subtract(color_a, color_b) ** 2)
     return float(squared_error)
@@ -66,7 +61,7 @@ class Member:
         return id(self)
 
     @classmethod
-    def new_members(cls, colors: _ColorArray) -> set[Member]:
+    def new_members(cls, stacked_vectors: FPArray) -> set[Member]:
         # TODO: check on definition of _ColorArray
         """Transform an array of rgb or rgbw colors into a set of _Member instances.
 
@@ -76,7 +71,7 @@ class Member:
         Silently drop colors without weight. It is possible to return an empty set if
         no colors have weight > 0.
         """
-        return {Member(color) for color in colors if color[-1] > 0}
+        return {Member(v) for v in stacked_vectors if v[-1] > 0}
 
 
 class Cluster:
@@ -104,6 +99,9 @@ class Cluster:
         self.queue_add: set[Member] = set()
         self.queue_sub: set[Member] = set()
 
+    def __hash__(self) -> int:
+        return id(self)
+
     @functools.cached_property
     def weight(self) -> float:
         """Get total weight of members.
@@ -111,24 +109,6 @@ class Cluster:
         :return: total weight of members
         """
         return sum(member.w for member in self.members)
-
-    @functools.cached_property
-    def bbox(self) -> BBox:
-        """Get bounding box of members.
-
-        :return: bounding box of members
-        """
-        return BBox.maybe_vector_bbox(self.as_array[:, :-1])
-
-    @functools.cached_property
-    def quick_error(self) -> float:
-        """Product of max dimension and weight as a rough cost metric.
-
-        :return: product of max dimension and weight
-        """
-        if len(self.members) == 1:
-            return 0.0
-        return max(self.bbox.dims) * self.weight
 
     @functools.cached_property
     def exemplar(self) -> _RgbF:
@@ -152,12 +132,27 @@ class Cluster:
 
     @property
     def as_array(self) -> _FPArray:
-        """Cluster as an array of member arrays.
-        """
+        """Cluster as an array of member arrays."""
         return np.array([member.as_array for member in self.members])
 
     @functools.cached_property
-    def _axis_of_highest_variance(self) -> npt.NDArray[np.floating[Any]]:
+    def eig(self) -> tuple[FPArray, FPArray]:
+        """Cache the value of np.linalf.eig on the covariance matrix of the cluster."""
+        members_array = self.as_array
+        colors, weights = members_array[:, :-1], members_array[:, -1]
+        covariance_matrix: _FPArray = np_cov(colors.T, aweights=weights)
+        return np.linalg.eig(covariance_matrix)
+
+    @functools.cached_property
+    def _variance(self) -> float:
+        """Get the variance of the cluster.
+
+        :return: variance of the cluster
+        """
+        return max(self.eig[0])
+
+    @functools.cached_property
+    def _axis_of_highest_variance(self) -> FPArray:
         """Get the first Eigenvector of the covariance matrix.
 
         Under a lot of condions, this will be the axis of highest variance. There are
@@ -166,10 +161,17 @@ class Cluster:
         worrying about. There may be other cases where this breaks (silently makes a
         suboptimal split) but I haven't found them yet.
         """
-        members_array = np.array([member.as_array for member in self.members])
-        colors, weights = members_array[:, :-1], members_array[:, -1]
-        covariance_matrix: _FPArray = np_cov(colors.T, aweights=weights)
-        return np.linalg.eig(covariance_matrix)[1][0]
+        return self.eig[1][np.argmax(self.eig[0])]
+
+    @functools.cached_property
+    def quick_error(self) -> float:
+        """Product of variance and weight as a rough cost metric.
+
+        :return: product of max dimension and weight
+        """
+        if len(self.members) == 1:
+            return 0.0
+        return self._variance * self.weight
 
     def split(self) -> set[Cluster]:
         """Split cluster into two clusters.
@@ -208,23 +210,13 @@ class Cluster:
         return {Cluster(left), Cluster(right)}
 
     @functools.cache
-    def get_squared_error(self, color: _RgbF) -> float:
+    def se(self, member: Member) -> float:
         """Get the cost of adding a member to this cluster.
 
         :param member: _Member instance
         :return: cost of adding member to this cluster
         """
-        # TODO: try sorting arguments to borrow from other's cache
-        return get_squared_error(color, self.exemplar)
-
-    def get_half_squared_error(self, color: _RgbF) -> float:
-        """Get the cost of adding a member to this cluster.
-
-        :param member: _Member instance
-        :return: cost of adding member to this cluster
-        # TODO: factor out get_half_squared_error
-        """
-        return self.get_squared_error(color) / 4
+        return get_squared_error(member.vs, self.exemplar)
 
     @functools.cached_property
     def sum_squared_error(self) -> float:
@@ -232,17 +224,13 @@ class Cluster:
 
         :return: sum of squared errors of all members
         """
-        return sum(
-            self.get_squared_error(member.vs) * member.w for member in self.members
-        )
+        return sum(self.se(member) * member.w for member in self.members)
 
     def process_queue(self) -> Cluster:
         """Process the add and sub queues and update exemplars."""
         if self.queue_add or self.queue_sub:
+            self.exemplar_age = 0
             return Cluster(self.members - self.queue_sub | self.queue_add)
         else:
             self.exemplar_age += 1
             return self
-
-
-

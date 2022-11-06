@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 221027 13:58:42
+# last modified: 221027 14:38:25
 """Test functions in triangulate_image.cluster_rgb.py
 
 :author: Shay Hill
@@ -20,6 +20,7 @@ from cluster_colors.stack_colors import stack_vectors, add_weight_axis
 from cluster_colors.stack_colors import stack_colors
 from cluster_colors.paths import TEST_DIR
 from cluster_colors.type_hints import FPArray
+from cluster_colors import cluster_rgb
 from matplotlib import pyplot as plt
 import matplotlib
 matplotlib.use('WebAgg')
@@ -61,7 +62,18 @@ class TestCluster:
         cluster = Cluster(members)
         clusters = cluster.split()
         clusters = set.union(*(c.split() for c in clusters))  # type: ignore
-        show_clusters(clusters)  # type: ignore
+        # show_clusters(clusters)  # type: ignore
+
+class TestCallers:
+    """Test the public functions that use Clusters and Members."""
+    def test_get_cluster_tuple(self) -> None:
+        """Return exemplar and members for a cluster."""
+        colors = np.array([[x, x, x, x] for x in range(1, 10)])
+        members = Member.new_members(colors)  
+        cluster = Cluster(members)
+        exemplar, members = cluster_rgb._get_cluster_tuple(cluster)
+        assert exemplar == (7, 7, 7)
+        assert {tuple(x) for x in members} == {tuple(x) for x in colors}
 
 def show_clusters(clusters: Iterable[Cluster]) -> None:
     """Display clusters as a scatter plot.
