@@ -1,6 +1,31 @@
-[tool.isort]
-profile = "black"
+[tool.poetry]
+name = "cluster-colors"
+version = "0.1.0"
+description = "Cluster color vectors with kmedians"
+authors = ["Shay Hill <shay_public@hotmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "cluster_colors"}]
 
-[tool.pytest.ini_options]
-#addopts = "-rfEX -p pytester --strict-markers --ignore=my_triangulate_image/my_geometry --ignore=my_geometry"
-pythonpath = ["my_cluster_colors"]
+[tool.poetry.dependencies]
+python = "^3.10"
+numpy = "^1.24.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.2.1"
+conventionalish = "^0.1.1"
+pillow = "^9.4.0"
+matplotlib = "^3.6.3"
+tornado = "^6.2"
+
+[tool.commitizen]
+name = "cz_conventionalish"
+version = "0.1.0"
+tag_format = "$version"
+version_files = [
+    "pyproject.toml:^version"
+]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
