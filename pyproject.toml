@@ -5,7 +5,7 @@ description = "Cluster color vectors with kmedians"
 authors = ["Shay Hill <shay_public@hotmail.com>"]
 license = "MIT"
 readme = "README.md"
-packages = [{include = "cluster_colors"}]
+packages = [{include = "cluster_colors", from = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -17,6 +17,7 @@ conventionalish = "^0.1.1"
 pillow = "^9.4.0"
 matplotlib = "^3.6.3"
 tornado = "^6.2"
+pre-commit = "^2.21.0"
 
 [tool.commitizen]
 name = "cz_conventionalish"
@@ -29,3 +30,23 @@ version_files = [
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pyright]
+include = ["src"]
+exclude = ["**/__pycache__.py"]
+
+pythonVersion = "3.10"
+pythonPlatform = "Any"
+
+typeCheckingMode = "strict"
+reportShadowedImports = true
+reportCallInDefaultInitializer = true
+reportImplicitStringConcatenation = true
+# reportMissingSuperCall = true
+reportPropertyTypeMismatch = true
+reportUninitializedInstanceVariable = true
+reportUnnecessaryTypeIgnoreComment = true
+reportUnusedCallResult = true
+
+venvPath = "C:\\Users\\shaya\\AppData\\Local\\pypoetry\\Cache\\virtualenvs"
+venv = "C:\\Users\\shaya\\AppData\\Local\\pypoetry\\Cache\\virtualenvs\\cluster-colors-cj794jDH-py3.11"

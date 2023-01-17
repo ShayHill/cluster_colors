@@ -160,8 +160,12 @@ class TestStackedQuantiles:
         values = quantiles_args[0] * 1.0
         weights = quantiles_args[1] * 1.0
         quantile = quantiles_args[2]
-        with_nd_array = stacked_quantile.get_stacked_quantiles(values, weights, quantile)
+        with_nd_array = stacked_quantile.get_stacked_quantiles(
+            values, weights, quantile
+        )
         values = values.reshape(-1, values.shape[-1])
         weights = weights.reshape(-1, weights.shape[-1])
-        with_2d_array = stacked_quantile.get_stacked_quantiles(values, weights, quantile)
+        with_2d_array = stacked_quantile.get_stacked_quantiles(
+            values, weights, quantile
+        )
         assert np.allclose(with_nd_array, with_2d_array)  # type: ignore

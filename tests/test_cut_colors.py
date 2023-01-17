@@ -11,9 +11,10 @@
 # pyright: reportMissingParameterType=false
 # pyright: reportUnknownParameterType=false
 
-from cluster_colors import cut_colors
-from cluster_colors import stack_vectors as sv
 import numpy as np
+
+from cluster_colors import cut_colors, stack_vectors as sv
+
 
 class TestCutColors:
     # TODO: test cut_colors

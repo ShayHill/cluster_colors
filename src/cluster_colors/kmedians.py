@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 221102 07:17:12
+# last modified: 230117 17:04:55
 """Cluster stacked vectors.
 
 Designed for divisive clustering, so start with one cluster and divide until some
@@ -45,9 +45,10 @@ class _ClusterSplitter:
         """Split the cluster with the highest SSE. Return True if a split occurred.
 
         :param min_error_to_split: the cost threshold for splitting
+        :return: True if a split occurred
 
         Could potentially make multiple splits if max_error is a tie, but this is
-        unlikely.
+        unlikely. The good news is that this will be deterministic.
         """
         candidates = [c for c in self.clusters if len(c.members) > 1]
         if not candidates:
@@ -69,15 +70,18 @@ class _ClusterMerger:
     Remove these clusters and add a new cluster with their combined members.
     """
 
-    def __init__(self, clusters: Clusters) -> None:
+    def __init__(self, clusters: Clusters):
+        """Initialize the merger with a set of clusters.
+
+        :param clusters: the clusters to merge
+        """
         self.clusters = clusters
 
     def __call__(self, merge_below_cost: float = np.inf) -> bool:
         """Merge the two clusters with the lowest exemplar span.
 
-        Return True if a merge occurred.
-
         :param merge_below_cost: the cost threshold for merging
+        :return: True if a merge occurred.
         """
         if len(self.clusters) < 2:
             return False
@@ -95,6 +99,10 @@ class _ClusterReassigner:
     """Reassign members to the closest cluster exemplar."""
 
     def __init__(self, clusters: Clusters) -> None:
+        """Initialize the reassigner with a set of clusters.
+
+        :param clusters: the clusters whose members may be reassigned
+        """
         self.clusters = clusters
 
     def _get_others(self, cluster: Cluster) -> set[Cluster]:
@@ -127,7 +135,11 @@ class _ClusterReassigner:
         return {x for x in others if spans(cluster, x) / 4 < max_se}
 
     def _offer_members(self, cluster: Cluster) -> None:
-        """Look for another cluster with lower cost for members of input cluster."""
+        """Look for another cluster with lower cost for members of input cluster.
+
+        :param cluster: the cluster offering its members to other clusters
+        :effect: moves members between clusters
+        """
         others = self._get_others(cluster)
         if not others:
             return
@@ -147,7 +159,10 @@ class _ClusterReassigner:
                 best_cluster.queue_add.add(member)
 
     def __call__(self) -> bool:
-        """Pass members between clusters and update exemplars."""
+        """Pass members between clusters and update exemplars.
+
+        :return: True if any changes were made
+        """
         if len(self.clusters) < 2:
             return False
         if all(x.exemplar_age > 0 for x in self.clusters):
@@ -158,6 +173,8 @@ class _ClusterReassigner:
 
 
 class KMediansClusters(Clusters):
+    """Clusters for kmedians clustering."""
+
     def __init__(self, clusters: Iterable[Cluster]) -> None:
         super().__init__(clusters)
         self.splitter = _ClusterSplitter(self)
@@ -166,9 +183,12 @@ class KMediansClusters(Clusters):
 
     @classmethod
     def from_stacked_vectors(cls, stacked_vectors: FPArray) -> KMediansClusters:
-        """Create a KMediansClusters from an iterable of colors."""
-        return cls({Cluster(Member.new_members(stacked_vectors))})
+        """Create a KMediansClusters from an iterable of colors.
 
+        :param stacked_vectors: An iterable of vectors with a weight axis
+        :return: A KMediansClusters instance
+        """
+        return cls({Cluster(Member.new_members(stacked_vectors))})
 
     def converge(self) -> None:
         """Reassign members until no changes occur."""
@@ -244,7 +264,11 @@ class KMediansClusters(Clusters):
 
     @property
     def _has_clear_winner(self) -> bool:
-        """Is one cluster heavier than the rest?"""
+        """Is one cluster heavier than the rest?
+
+        :return: True if one cluster is heavier than the rest. Will almost always be
+        true.
+        """
         if len(self) == 1:
             return True
         weights = [c.w for c in self]

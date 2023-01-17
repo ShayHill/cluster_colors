@@ -1,26 +1,30 @@
 #!/usr/bin/env python3
-# last modified: 221108 12:21:22
+# last modified: 230117 16:45:20
 """Create and use cluster images from image colors
 
 :author: Shay Hill
 :created: 2022-11-07
 """
 
+# pyright: reportUnknownMemberType=false
+# pyright: reportUnknownArgumentType=false
+
 from __future__ import annotations
 
 import pickle
-from _operator import attrgetter
 from pathlib import Path
 
 import numpy as np
+from _operator import attrgetter
+from PIL import Image
 
-from cluster_colors.kmedians import KMediansClusters
 from cluster_colors.cut_colors import cut_colors
-from cluster_colors.paths import PICKLE_DIR, TEST_DIR, BINARIES_DIR
+from cluster_colors.kmedians import KMediansClusters
+from cluster_colors.paths import PICKLE_DIR
 from cluster_colors.pool_colors import pool_colors
 from cluster_colors.stack_vectors import stack_vectors
-from cluster_colors.type_hints import FPArray, NBits, StackedVectors
-from PIL import Image
+from cluster_colors.type_hints import NBits, StackedVectors
+
 
 def stack_image_colors(
     filename: Path | str,
@@ -75,34 +79,39 @@ def get_biggest_color(stacked_colors: StackedVectors) -> tuple[float, ...]:
     winner = max(clusters, key=attrgetter("w"))
     return winner.exemplar
 
-def show_clusters(clusters: KMediansClusters, filename_stem: str) -> None:
-    width = 1000
-    sum_weight = sum(c.w for c in clusters)
-    stripes: list[FPArray] = []
-    for cluster in clusters:
-        stripe_width = max(round(cluster.w / sum_weight * width), 1)
-        stripes.append(np.tile(cluster.vs, (800, stripe_width)).reshape(800, stripe_width, 3).astype(np.uint8))
-    #combine stripes into one array
-    image = np.concatenate(stripes, axis=1)
 
-    # image = Image.fromarray(np.hstack(*stripes))  # type: ignore
-    image = Image.fromarray(image)
-    image.save(BINARIES_DIR / f"{filename_stem}-{len(clusters)}.png")
+# def show_clusters(clusters: KMediansClusters, filename_stem: str) -> None:
+#     width = 1000
+#     sum_weight = sum(c.w for c in clusters)
+#     stripes: list[FPArray] = []
+#     for cluster in clusters:
+#         stripe_width = max(round(cluster.w / sum_weight * width), 1)
+#         stripes.append(
+#             np.tile(cluster.vs, (800, stripe_width))
+#             .reshape(800, stripe_width, 3)
+#             .astype(np.uint8)
+#         )
+#     # combine stripes into one array
+#     image = np.concatenate(stripes, axis=1)
 
-if __name__ == "__main__":
-    # open image, convert to array, and pass color array to get_biggest_color
-
-    # img = Image.open("test/sugar-shack-barnes.jpg")
-    import time
-
-    start = time.time()
-    colors = stack_image_colors(TEST_DIR / "sugar-shack-barnes.jpg")
-    print(time.time() - start)
+#     # image = Image.fromarray(np.hstack(*stripes))
+#     image = Image.fromarray(image)
+#     image.save(BINARIES_DIR / f"{filename_stem}-{len(clusters)}.png")
 
 
-    clusters = KMediansClusters.from_stacked_vectors(colors)
-    _ = clusters.split_to_se(32**2)
-    show_clusters(clusters, "sugar-shack-barnes")
+# if __name__ == "__main__":
+#     # open image, convert to array, and pass color array to get_biggest_color
 
+#     # img = Image.open("test/sugar-shack-barnes.jpg")
+#     from cluster_colors.paths import TEST_DIR, BINARIES_DIR
+#     import time
 
-    get_biggest_color(colors)
+#     start = time.time()
+#     colors = stack_image_colors(TEST_DIR / "sugar-shack-barnes.jpg")
+#     print(time.time() - start)
+
+#     clusters = KMediansClusters.from_stacked_vectors(colors)
+#     _ = clusters.split_to_se(32**2)
+#     show_clusters(clusters, "sugar-shack-barnes")
+
+#     get_biggest_color(colors)

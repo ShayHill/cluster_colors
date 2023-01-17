@@ -37,10 +37,7 @@ class TestAddWeightAxis:
         """Test the add_weight_axis method does not alter input."""
         input_array = np.array([[1, 2, 3], [4, 5, 6]])
         _ = sv.add_weight_axis(input_array)
-        np.testing.assert_array_equal(
-            input_array,
-            np.array([[1, 2, 3], [4, 5, 6]]),
-        )
+        np.testing.assert_array_equal(input_array, np.array([[1, 2, 3], [4, 5, 6]]))
 
     def test_uint8_input_returns_floats_in_output(self):
         """Test the add_weight_axis method returns floats for uint8 input."""
@@ -70,17 +67,13 @@ class TestStackVectors:
         input_array = np.array([[1, 2, 3, 55], [4, 5, 6, 5], [1, 2, 3, 45]])
         _ = sv.stack_vectors(input_array)
         np.testing.assert_array_equal(
-            input_array,
-            np.array([[1, 2, 3, 55], [4, 5, 6, 5], [1, 2, 3, 45]]),
+            input_array, np.array([[1, 2, 3, 55], [4, 5, 6, 5], [1, 2, 3, 45]])
         )
 
     def test_optional_weight_parameter(self):
         """Test the optional weight parameter."""
         np.testing.assert_array_equal(
-            sv.stack_vectors(
-                np.array([[1, 2, 3], [4, 5, 6], [1, 2, 3]]),
-                weight=128,
-            ),
+            sv.stack_vectors(np.array([[1, 2, 3], [4, 5, 6], [1, 2, 3]]), weight=128),
             np.array([[1, 2, 3, 256], [4, 5, 6, 128]]),
         )
 

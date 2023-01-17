@@ -18,8 +18,8 @@ import numpy as np
 from PIL import Image
 
 from cluster_colors import pool_colors
-from cluster_colors.stack_vectors import stack_vectors
 from cluster_colors.paths import TEST_DIR
+from cluster_colors.stack_vectors import stack_vectors
 
 _T = TypeVar("_T")
 

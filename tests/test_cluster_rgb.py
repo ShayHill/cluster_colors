@@ -6,24 +6,24 @@
 :created: 2022-09-16
 """
 
+from typing import Iterable
+
+import matplotlib
 import numpy as np
 import numpy.typing as npt
 import pytest
+from matplotlib import pyplot as plt
 from PIL import Image
 
-from typing import Iterable
 # pyright: reportPrivateUsage=false
 import cluster_colors.clusters
+from cluster_colors import kmedians
 from cluster_colors.clusters import Cluster, Member
-from cluster_colors import kmedians
-from cluster_colors.stack_vectors import stack_vectors, add_weight_axis
 from cluster_colors.paths import TEST_DIR
+from cluster_colors.stack_vectors import add_weight_axis, stack_vectors
 from cluster_colors.type_hints import FPArray
-from cluster_colors import kmedians
-from matplotlib import pyplot as plt
-import matplotlib
-matplotlib.use('WebAgg')
 
+matplotlib.use("WebAgg")
 
 
 @pytest.fixture
@@ -54,6 +54,7 @@ class TestClusterExemplar:
         )
         assert cluster.exemplar == (1, 2, 3)
 
+
 class TestCluster:
     def test_split(self) -> None:
         """Return 256 clusters given 256 colors."""
@@ -63,8 +64,10 @@ class TestCluster:
         clusters = set.union(*(c.split() for c in clusters))  # type: ignore
         # show_clusters(clusters)  # type: ignore
 
+
 class TestCallers:
     """Test the public functions that use Clusters and Members."""
+
     # def test_get_cluster_tuple(self) -> None:
     #     """Return exemplar and members for a cluster."""
     #     colors = np.array([[x, x, x, x] for x in range(1, 10)])
@@ -73,6 +76,7 @@ class TestCallers:
     #     exemplar, members = cluster_rgb._get_cluster_tuple(cluster)
     #     assert exemplar == (7, 7, 7)
     #     assert {tuple(x) for x in members} == {tuple(x) for x in colors}
+
 
 def show_clusters(clusters: Iterable[Cluster]) -> None:
     """Display clusters as a scatter plot.
@@ -88,8 +92,6 @@ def show_clusters(clusters: Iterable[Cluster]) -> None:
         x, y = zip(*points)
         plt.scatter(x, y, color=color)  # type: ignore
     plt.show()  # type: ignore
-
-
 
 
 # def test_resets_exemplar_age(self) -> None:

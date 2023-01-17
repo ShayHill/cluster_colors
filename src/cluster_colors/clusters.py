@@ -1,16 +1,22 @@
+"""The members, clusters, and groups of clusters.
+
+:author: Shay Hill
+:created: 2023-01-17
+"""
+
+# pyright: reportUnknownMemberType=false
+
 from __future__ import annotations
 
 import functools
 from typing import Any, Iterable, Iterator, cast
 
 import numpy as np
-from numpy import cov as np_cov, typing as npt  # type: ignore
 
 from cluster_colors.distance_matrix import DistanceMatrix
 from cluster_colors.stacked_quantile import get_stacked_median, get_stacked_medians
 from cluster_colors.type_hints import FPArray, StackedVectors, Vector, VectorLike
 
-np_cov = cast(Any, np_cov)
 
 def _get_squared_error(vector_a: VectorLike, vector_b: VectorLike) -> float:
     """Get squared distance between two vectors.
@@ -32,7 +38,7 @@ class Member:
     colors weighing less.
     """
 
-    def __init__(self, weighted_vector: Vector) -> None:
+    def __init__(self, weighted_vector: Vector):
         """Create a new Member instance
 
         :param weighted_vector: a vector with a weight in the last axis
@@ -42,19 +48,25 @@ class Member:
 
     @property
     def vs(self) -> tuple[float, ...]:
-        """All value axes of the Member as a tuple."""
+        """All value axes of the Member as a tuple.
+
+        :return: tuple of values that are not the weight
+        """
         return tuple(self.as_array[:-1])
 
     @property
     def w(self) -> float:
-        """Weight of the Member."""
+        """Weight of the Member.
+
+        :return: weight of the Member
+        """
         return self.as_array[-1]
 
     @classmethod
     def new_members(cls, stacked_vectors: StackedVectors) -> set[Member]:
         """Transform an array of rgb or rgbw colors into a set of _Member instances.
 
-        :param colors: list of colors
+        :param stacked_vectors: a list of vectors with weight channels in the last axis
         :return: set of Member instances
 
         Silently drop colors without weight. It is possible to return an empty set if
@@ -90,20 +102,29 @@ class Cluster:
 
     @functools.cached_property
     def as_array(self) -> FPArray:
-        """Cluster as an array of member arrays."""
+        """Cluster as an array of member arrays.
+
+        :return: array of member arrays [[x, y, z, w], [x, y, z, w], ...]
+        """
         return np.array([member.as_array for member in self.members])
 
     @functools.cached_property
     def vs(self) -> tuple[float, ...]:
-        """Values for cluster as a member instance"""
+        """Values for cluster as a member instance.
+
+        :return: tuple of values (x, y, z, w)
+        """
         vss, ws = np.split(self.as_array, [-1], axis=1)
         return tuple(get_stacked_medians(vss, ws))
 
     @functools.cached_property
     def w(self) -> float:
-        """Total weight of members."""
+        """Total weight of members.
+
+        :return: total weight of members
+        """
         _, ws = np.split(self.as_array, [-1], axis=1)
-        return np.sum(ws)
+        return cast(float, np.sum(ws))
 
     @property
     def exemplar(self) -> tuple[float, ...]:
@@ -128,9 +149,12 @@ class Cluster:
 
     @functools.cached_property
     def _np_linalg_eig(self) -> tuple[FPArray, FPArray]:
-        """Cache the value of np.linalf.eig on the covariance matrix of the cluster."""
+        """Cache the value of np.linalg.eig on the covariance matrix of the cluster.
+
+        :return: tuple of eigenvalues and eigenvectors
+        """
         vss, ws = np.split(self.as_array, [-1], axis=1)
-        covariance_matrix: FPArray = np_cov(vss.T, aweights=ws.flatten())
+        covariance_matrix: FPArray = np.cov(vss.T, aweights=ws.flatten())
         eigenvalues, eigenvectors = np.linalg.eig(covariance_matrix)
         return eigenvalues.astype(float), eigenvectors.astype(float)
 
@@ -145,6 +169,8 @@ class Cluster:
     @functools.cached_property
     def _axis_of_highest_variance(self) -> FPArray:
         """Get the first Eigenvector of the covariance matrix.
+
+        :return: Eigenvector of the covariance matrix
 
         Under a lot of conditions, this will be the axis of highest variance. There are
         things that will break this, like all colors lying on the (1, 1, 1) line, but
@@ -172,6 +198,7 @@ class Cluster:
         """Split cluster into two clusters.
 
         :return: two new clusters
+        :raises ValueError: if cluster has only one member
 
         Split the cluster into two clusters by the plane perpendicular to the axis of
         highest variance.
@@ -188,12 +215,16 @@ class Cluster:
         abc = self._axis_of_highest_variance
 
         def get_rel_dist(rgb: VectorLike) -> float:
-            """Get relative distance of rgb from plane Ax + By + Cz + 0."""
-            return float(np.dot(abc, rgb))  # type: ignore
+            """Get relative distance of rgb from plane Ax + By + Cz + 0.
+
+            :param rgb: color to get distance from plane
+            :return: relative distance of rgb from plane
+            """
+            return float(np.dot(abc, rgb))
 
         scored = [(get_rel_dist(member.vs), member) for member in self.members]
         median_score = get_stacked_median(
-            [s for s, _ in scored], [m.w for _, m in scored]
+            np.array([s for s, _ in scored]), np.array([m.w for _, m in scored])
         )
         left = {m for s, m in scored if s < median_score}
         right = {m for s, m in scored if s > median_score}
@@ -204,11 +235,11 @@ class Cluster:
             right |= center
         return {Cluster(left), Cluster(right)}
 
-    @functools.cache
+    @functools.lru_cache(512)
     def se(self, member: Member) -> float:
         """Get the cost of adding a member to this cluster.
 
-        :param member: _Member instance
+        :param member: Member instance
         :return: cost of adding member to this cluster
         """
         return _get_squared_error(member.vs, self.exemplar)
@@ -222,13 +253,15 @@ class Cluster:
         return sum(self.se(member) * member.w for member in self.members)
 
     def process_queue(self) -> Cluster:
-        """Process the add and sub queues and update exemplars."""
+        """Process the add and sub queues and update exemplars.
+
+        :return: self
+        """
         if self.queue_add or self.queue_sub:
             self.exemplar_age = 0
             return Cluster(self.members - self.queue_sub | self.queue_add)
-        else:
-            self.exemplar_age += 1
-            return self
+        self.exemplar_age += 1
+        return self
 
 
 def _get_cluster_squared_error(cluster_a: Cluster, cluster_b: Cluster) -> float:
@@ -251,28 +284,46 @@ class Clusters:
     """
 
     def __init__(self, clusters: Iterable[Cluster]):
+        """Create a new Clusters instance."""
         self._clusters: set[Cluster] = set()
         self.spans: DistanceMatrix[Cluster]
         self.spans = DistanceMatrix(_get_cluster_squared_error)
         self.add(*clusters)
 
     def __iter__(self) -> Iterator[Cluster]:
+        """Iterate over clusters.
+
+        :return: iterator
+        """
         return iter(self._clusters)
 
     def __len__(self) -> int:
+        """Get number of clusters.
+
+        :return: number of clusters
+        """
         return len(self._clusters)
 
     def add(self, *cluster_args: Cluster) -> None:
+        """Add clusters to the set.
+
+        :param cluster_args: Cluster, accepts multiple args
+        """
         for cluster in cluster_args:
             self._clusters.add(cluster)
             self.spans.add(cluster)
 
     def remove(self, *cluster_args: Cluster) -> None:
+        """Remove clusters from the set and update the distance matrix.
+
+        :param cluster_args: a Cluster, accepts multiple args
+        """
         for cluster in cluster_args:
             self._clusters.remove(cluster)
             self.spans.remove(cluster)
 
     def process_queues(self) -> None:
+        """Apply queued updates to all Cluster instances."""
         processed = {c.process_queue() for c in self._clusters}
         self.remove(*(self._clusters - processed))
         self.add(*(processed - self._clusters))

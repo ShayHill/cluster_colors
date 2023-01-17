@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 221107 18:00:49
+# last modified: 230117 17:05:45
 """Add and manipulate a vector weight axis.
 
 This project is built around combining identical vectors (presumably colors) into
@@ -23,6 +23,9 @@ what we want (so we can identify and address it outside the module).
 :author: Shay Hill
 :created: 2022-10-18
 """
+
+# pyright: reportUnknownMemberType=false
+# pyright: reportUnknownArgumentType=false
 
 from typing import Any, Optional
 
@@ -51,7 +54,7 @@ def add_weight_axis(
     """
     assert weight > 0, "Weight must be greater than 0."
     ws = np.full(vectors.shape[:-1] + (1,), weight)
-    return np.append(vectors, ws, axis=-1).astype(float)  # type: ignore
+    return np.append(vectors, ws, axis=-1).astype(float)
 
 
 def stack_vectors(
@@ -70,11 +73,11 @@ def stack_vectors(
 
     flat_vectors = vectors.reshape(-1, vectors.shape[-1]).astype(float)
 
-    unique_vectors, where_seen = np.unique(  # type: ignore
+    unique_vectors, where_seen = np.unique(
         flat_vectors[:, :-1], return_inverse=True, axis=0
     )
     idx2seen = [0.0] * len(unique_vectors)
     for i, idx in enumerate(where_seen):
         idx2seen[idx] += flat_vectors[i, -1]
     weights = np.array(idx2seen).reshape(-1, 1)
-    return np.append(unique_vectors, weights, axis=-1)  # type: ignore
+    return np.append(unique_vectors, weights, axis=-1)

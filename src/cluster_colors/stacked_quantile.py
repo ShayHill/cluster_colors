@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 221108 11:36:16
+# last modified: 230117 17:14:51
 """'Stacked' quantile functions. Close to weighted quantile functions.
 
 These functions are used to calculate quantiles of a set of values, where each value
@@ -34,18 +34,20 @@ This "weights as occurrences" interpretation has two pitfalls:
 :author: Shay Hill
 :created: 2022-09-23
 """
+
+# pyright: reportUnknownArgumentType=false
+# pyright: reportUnknownMemberType=false
+# pyright: reportUnknownArgumentType=false
+# pyright: reportUnknownVariableType=false
+
 from typing import cast
 
 import numpy as np
 
-from cluster_colors.type_hints import FPArray, Vector, VectorLike
+from cluster_colors.type_hints import FPArray
 
 
-def get_stacked_quantile(
-    values: VectorLike,
-    weights: VectorLike,
-    quantile: float,
-) -> float:
+def get_stacked_quantile(values: FPArray, weights: FPArray, quantile: float) -> float:
     """Get a weighted quantile for a vector of values.
 
     :param values: array of values with shape (n,)
@@ -57,8 +59,8 @@ def get_stacked_quantile(
     :raises ValueError: if values array is empty (after removing zero-weight values)
     :raises ValueError: if weights are not all positive
     """
-    avalues: Vector = np.asarray(values)
-    aweights: Vector = np.asarray(weights)
+    avalues = np.asarray(values)
+    aweights = np.asarray(weights)
     if avalues.shape[-1] != aweights.shape[-1]:
         raise ValueError("values and weights must be the same length")
     if quantile < 0 or quantile > 1:
@@ -66,7 +68,7 @@ def get_stacked_quantile(
 
     avalues, aweights = avalues[aweights != 0], aweights[aweights != 0]
 
-    if not len(avalues):
+    if not avalues:
         raise ValueError("avalues empty (after removing zero-weight avalues)")
     if any(weight < 0 for weight in aweights):
         raise ValueError("aweights must be non-negative")
@@ -74,19 +76,27 @@ def get_stacked_quantile(
     sorter = np.argsort(avalues)
     sorted_values = avalues[sorter]
     sorted_weights = aweights[sorter]
-    cum_aweights = cast(Vector, np.cumsum(sorted_weights))
+    cum_aweights = np.cumsum(sorted_weights)
     target = cum_aweights[-1] * quantile
     index = np.searchsorted(cum_aweights, target, side="right")
+    assert isinstance(index, int)
     if index == 0:
         return sorted_values[0]
     if np.isclose(cum_aweights[index - 1], target):
         lower = sorted_values[index - 1]
         upper = sorted_values[index]
-        return (lower + upper) / 2
-    return sorted_values[index]
+        avg = (lower + upper) / 2
+        assert isinstance(avg, float)
+        return avg
+
+    at_quantile = sorted_values[index]
+    assert isinstance(at_quantile, float)
+    return at_quantile
 
 
-def get_stacked_quantiles(values: FPArray, weights: FPArray, quantile: float) -> Vector:
+def get_stacked_quantiles(
+    values: FPArray, weights: FPArray, quantile: float
+) -> FPArray:
     """Get a weighted quantile for an array of vectors.
 
     :param values: array of vectors with shape (..., m)
@@ -103,15 +113,15 @@ def get_stacked_quantiles(values: FPArray, weights: FPArray, quantile: float) ->
         raise ValueError(
             "values and weights must have the same shape up to the last axis"
         )
-    flat_vectors = values.reshape(-1, values.shape[-1]).T
+    flat_vectors: FPArray = values.reshape(-1, values.shape[-1]).T
     flat_weights = weights.flatten()
     by_axis: list[float] = []
     for axis in flat_vectors:
         by_axis.append(get_stacked_quantile(axis, flat_weights, quantile))
-    return np.array(by_axis)
+    return cast(FPArray, np.array(by_axis))
 
 
-def get_stacked_median(values: VectorLike, weights: VectorLike) -> float:
+def get_stacked_median(values: FPArray, weights: FPArray) -> float:
     """Get a weighted median for a value.
 
     :param values: array of values with shape (n,)
@@ -124,7 +134,7 @@ def get_stacked_median(values: VectorLike, weights: VectorLike) -> float:
     return get_stacked_quantile(values, weights, 0.5)
 
 
-def get_stacked_medians(values: FPArray, weights: FPArray) -> Vector:
+def get_stacked_medians(values: FPArray, weights: FPArray) -> FPArray:
     """Get a weighted median for an array of vectors.
 
     :param values: array of vectors with shape (..., m)

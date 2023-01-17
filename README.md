@@ -28,5 +28,3 @@ Once you split a cluster, it's acceptable to just throw it away. And you will pr
 a maximum of 262_144 by averaging. The ouput of `pool_colors` will also contain
 a weight axis for each color, representing the combined opacity of all pixels
 of that color.
-
-
