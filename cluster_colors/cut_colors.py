@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 221028 15:58:08
+# last modified: 221107 17:55:53
 """Cluster colors with median cut.
 
 Repeatedly subdivide the color space by splitting along the longest axis (not
@@ -14,12 +14,11 @@ starting point for kmedians.
 :author: Shay Hill
 :created: 2022-10-21
 """
-from operator import attrgetter
 
 import numpy as np
 
 from cluster_colors.clusters import Cluster, Member
-from cluster_colors.type_hints import StackedColors
+from cluster_colors.type_hints import StackedVectors
 
 
 def _split_every_cluster(clusters: set[Cluster], max_num: int) -> set[Cluster]:
@@ -57,7 +56,7 @@ def _split_largest_cluster(clusters: set[Cluster], num: int) -> set[Cluster]:
     return _split_every_cluster(clusters, num)
 
 
-def cut_colors(colors: StackedColors, num: int) -> StackedColors:
+def cut_colors(colors: StackedVectors, num: int) -> StackedVectors:
     """Merge colors into a set of num colors.
 
     :param colors: a (-1, 4) array of unique rgb values with weights

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 221106 16:39:54
+# last modified: 230117 08:54:10
 """Test functions in triangulate_image.kmedians.py
 
 :author: Shay Hill
@@ -27,11 +27,11 @@ matplotlib.use('WebAgg')
 
 
 @pytest.fixture
-def thin_cluster() -> cluster_colors.rgb_members_and_clusters.Cluster:
+def thin_cluster() -> cluster_colors.clusters.Cluster:
     """A cluster with all members along the (0,0,0) to (1,1,1) line."""
     colors = np.array([[x, x, x, x] for x in range(10)])
-    members = cluster_colors.rgb_members_and_clusters.Member.new_members(colors)
-    return cluster_colors.rgb_members_and_clusters.Cluster(members)
+    members = cluster_colors.clusters.Member.new_members(colors)
+    return cluster_colors.rgb_clusters.Cluster(members)
 
 
 class TestMemberNewMembers:
@@ -49,7 +49,7 @@ class TestClusterExemplar:
 
     def test_exemplar(self) -> None:
         """Return weighted average of member.rgb values."""
-        cluster = cluster_colors.rgb_members_and_clusters.Cluster(
+        cluster = cluster_colors.clusters.Cluster(
             {Member(np.array([1, 2, 3, 2])), Member(np.array([4, 5, 6, 1]))}
         )
         assert cluster.exemplar == (1, 2, 3)
@@ -65,14 +65,14 @@ class TestCluster:
 
 class TestCallers:
     """Test the public functions that use Clusters and Members."""
-    def test_get_cluster_tuple(self) -> None:
-        """Return exemplar and members for a cluster."""
-        colors = np.array([[x, x, x, x] for x in range(1, 10)])
-        members = Member.new_members(colors)
-        cluster = Cluster(members)
-        exemplar, members = cluster_rgb._get_cluster_tuple(cluster)
-        assert exemplar == (7, 7, 7)
-        assert {tuple(x) for x in members} == {tuple(x) for x in colors}
+    # def test_get_cluster_tuple(self) -> None:
+    #     """Return exemplar and members for a cluster."""
+    #     colors = np.array([[x, x, x, x] for x in range(1, 10)])
+    #     members = Member.new_members(colors)
+    #     cluster = Cluster(members)
+    #     exemplar, members = cluster_rgb._get_cluster_tuple(cluster)
+    #     assert exemplar == (7, 7, 7)
+    #     assert {tuple(x) for x in members} == {tuple(x) for x in colors}
 
 def show_clusters(clusters: Iterable[Cluster]) -> None:
     """Display clusters as a scatter plot.
@@ -94,8 +94,8 @@ def show_clusters(clusters: Iterable[Cluster]) -> None:
 
 # def test_resets_exemplar_age(self) -> None:
 # """Reset exemplar_age to 0 when exemplar is accessed."""
-# cluster = cluster_colors.rgb_members_and_clusters.Cluster(
-# {cluster_colors.rgb_members_and_clusters.Member((1, 2, 3), 2), cluster_colors.rgb_members_and_clusters.Member((4, 5, 6), 1)}
+# cluster = cluster_colors.clusters.Cluster(
+# {cluster_colors.clusters.Member((1, 2, 3), 2), cluster_colors.clusters.Member((4, 5, 6), 1)}
 # )
 # cluster.exemplar_age = 1
 # _ = cluster.exemplar

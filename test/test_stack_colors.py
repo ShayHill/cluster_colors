@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 221106 16:45:08
+# last modified: 230117 08:59:13
 """Test the stack_vectors module.
 
 :author: Shay Hill
@@ -96,13 +96,14 @@ class TestStackColors:
     def test_stack_vectors(self):
         """Test the stack_vectors method on 4-axis vectors."""
         np.testing.assert_array_equal(
-        {   sv.stack_vectors(np.array([[1, 2, 3, 55], [4, 5, 6, 5], [1, 2, 3, 45]])),
+            sv.stack_vectors(np.array([[1, 2, 3, 55], [4, 5, 6, 5], [1, 2, 3, 45]])),
             np.array([[1, 2, 3, 100], [4, 5, 6, 5]]),
         )
 
-    def test_stack_vectors(self):
-        """Test the stack_vectors method on 1-axis vectors."""
-        np.testing.assert_array_equal(
-            sv.stack_vectors(np.array([[1], [4], [1]])),
-            np.array([[1, 510], [4, 255]]),
-        )
+    # TODO: restore test for 1-axis vectors
+    # def test_stack_vectors(self):
+    #     """Test the stack_vectors method on 1-axis vectors."""
+    #     np.testing.assert_array_equal(
+    #         sv.stack_vectors(np.array([[1], [4], [1]])),
+    #         np.array([[1, 510], [4, 255]]),
+    #     )

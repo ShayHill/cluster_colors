@@ -6,6 +6,8 @@ from collections.abc import Callable
 from typing import Any, TypeVar
 from numpy import bool_ as bool_, dtype, float64, ndarray, squeeze as squeeze
 
+_T = TypeVar('_T')
+
 _ShapeType = TypeVar("_ShapeType", bound=Any)
 _DType_co = TypeVar("_DType_co", bound=dtype[Any], covariant=True)
 __all__: list[str]
@@ -828,7 +830,7 @@ fromfunction: _convert2ma
 identity: _convert2ma
 ones: _convert2ma
 zeros: _convert2ma
-def append(a, b, axis=...):
+def append(a: _T, b: Any, axis: Any=...) -> _T:
     ...
 
 def dot(a, b, strict=..., out=...):

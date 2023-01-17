@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-# last modified: 221028 15:53:59
+# last modified: 221107 18:00:49
 """Add and manipulate a vector weight axis.
 
 This project is built around combining identical vectors (presumably colors) into
 single instances with a weight axis (reflecting the combined weight of the combined
-weight of the combined vectors) then treating those single combined vectors as
-multiples. For instance:
+vectors) then treating those single combined vectors as multiples. For instance:
 
 (1, 2, 3), (1, 2, 3), (4, 5, 6) would be stored as
 
@@ -25,15 +24,17 @@ what we want (so we can identify and address it outside the module).
 :created: 2022-10-18
 """
 
-from typing import Annotated, Any, Optional
+from typing import Any, Optional
 
 import numpy as np
 from numpy import typing as npt
 
-from cluster_colors.type_hints import FPArray, Pixels, StackedColors
+from cluster_colors.type_hints import FPArray, StackedVectors
 
 
-def add_weight_axis(vectors: npt.NDArray[Any], weight: float = 255.0) -> FPArray:
+def add_weight_axis(
+    vectors: npt.NDArray[np.number[Any]], weight: float = 255.0
+) -> FPArray:
     """Add a weight axis to a vector of vectors.
 
     :param vectors: A vector of vectors with shape (..., n).
@@ -55,7 +56,7 @@ def add_weight_axis(vectors: npt.NDArray[Any], weight: float = 255.0) -> FPArray
 
 def stack_vectors(
     vectors: npt.NDArray[np.number[Any]], weight: Optional[float] = None
-) -> Annotated[FPArray, (-1, -1)]:
+) -> StackedVectors:
     """Find and count unique vectors.
 
     :param vectors: array of numbers, with shape (..., n)

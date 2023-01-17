@@ -1,47 +1,30 @@
 from __future__ import annotations
 
 import functools
-from dataclasses import dataclass
-from typing import Annotated, Any, Iterable, Iterator, TypeAlias, cast, Sequence, \
-    Optional
+from typing import Any, Iterable, Iterator, cast
 
 import numpy as np
-from numpy import cov as np_cov  # type: ignore
-from numpy import typing as npt
+from numpy import cov as np_cov, typing as npt  # type: ignore
 
 from cluster_colors.distance_matrix import DistanceMatrix
 from cluster_colors.stacked_quantile import get_stacked_median, get_stacked_medians
-from cluster_colors.type_hints import FPArray
+from cluster_colors.type_hints import FPArray, StackedVectors, Vector, VectorLike
 
 np_cov = cast(Any, np_cov)
 
-_RgbF = tuple[float, float, float]
-_RgbI = tuple[int, int, int]
+def _get_squared_error(vector_a: VectorLike, vector_b: VectorLike) -> float:
+    """Get squared distance between two vectors.
 
-_ThreeInts: TypeAlias = tuple[int, int, int]
-_FourInts: TypeAlias = tuple[int, int, int, int]
-_FPArray: TypeAlias = npt.NDArray[np.floating[Any]]
-
-_ColorArray = (
-    Annotated[npt.NDArray[np.uint8], "(..., 3) | (..., 4)"] | Sequence[Sequence[int]]
-)
-
-
-def get_squared_error(color_a: _RgbF, color_b: _RgbF) -> float:
-    """Get squared distance between two colors.
-
-    return: squared distance from color_a to color_b
+    :param vector_a: vector
+    :param vector_b: vector
+    :return: squared Euclidian distance from vector_a to vector_b
     """
-    squared_error: np.floating[Any] = np.sum(np.subtract(color_a, color_b) ** 2)
+    squared_error: np.floating[Any] = np.sum(np.subtract(vector_a, vector_b) ** 2)
     return float(squared_error)
 
 
-@dataclass(frozen=True)
 class Member:
     """A member of a cluster.
-
-    :param rgb: rgb tuple
-    :param w: combined weight of all occurrences of this rgb value in an image
 
     When clustering initial images arrays, the weight will only represent the number
     of times the color appears in the image. After removing some color or adding an
@@ -49,22 +32,26 @@ class Member:
     colors weighing less.
     """
 
-    as_array: Annotated[_FPArray, 4]
+    def __init__(self, weighted_vector: Vector) -> None:
+        """Create a new Member instance
+
+        :param weighted_vector: a vector with a weight in the last axis
+        :param ancestors: sets of ancestors to merge
+        """
+        self.as_array = weighted_vector
 
     @property
-    def vs(self) -> _RgbF:
+    def vs(self) -> tuple[float, ...]:
+        """All value axes of the Member as a tuple."""
         return tuple(self.as_array[:-1])
 
     @property
     def w(self) -> float:
+        """Weight of the Member."""
         return self.as_array[-1]
 
-    def __hash__(self) -> int:
-        return id(self)
-
     @classmethod
-    def new_members(cls, stacked_vectors: FPArray) -> set[Member]:
-        # TODO: check on definition of _ColorArray
+    def new_members(cls, stacked_vectors: StackedVectors) -> set[Member]:
         """Transform an array of rgb or rgbw colors into a set of _Member instances.
 
         :param colors: list of colors
@@ -77,21 +64,21 @@ class Member:
 
 
 class Cluster:
-    """A cluster of _Member instances.
+    """A cluster of Member instances.
 
-    :param members: _Member instances
+    :param members: Member instances
 
-    Hold members in a set. It is important for convergence that the exemplar is not
+    Hold Members in a set. It is important for convergence that the exemplar is not
     updated each time a member is added or removed. Add members from other clusters to
     queue_add and self members to queue_sub. Do not update the members or
     process_queue until each clusters' members have be offered to all other clusters.
 
     When all clusters that should be moved have been inserted into queues, call
-    process_queue and, if changes have occurred, create a new exemplar for the next
-    round.
+    process_queue and, if changes have occurred, create a new Cluster instance for
+    the next round.
 
-    This is almost a frozen class, but the queue_add and queue_sub attributes are
-    mutable.
+    This is almost a frozen class, but the queue_add, queue_sub, and exemplar_age
+    attributes are mutable.
     """
 
     def __init__(self, members: Iterable[Member]) -> None:
@@ -102,30 +89,21 @@ class Cluster:
         self.queue_sub: set[Member] = set()
 
     @functools.cached_property
-    def as_array(self) -> _FPArray:
+    def as_array(self) -> FPArray:
         """Cluster as an array of member arrays."""
         return np.array([member.as_array for member in self.members])
 
     @functools.cached_property
-    def as_member(self) -> Member:
-        """Get cluster as a Member instance.
-
-        :return: Member instance with rgb and weight of exemplar
-        """
-        vss, ws = np.split(self.as_array, [-1], axis=1)
-        vs = get_stacked_medians(vss, ws)
-        return Member(np.append(vs, sum(ws)))
-
-    @property
-    def w(self) -> float:
-        """Total weight of members.
-        """
-        return self.as_member.w
-
-    @property
     def vs(self) -> tuple[float, ...]:
         """Values for cluster as a member instance"""
-        return self.as_member.vs
+        vss, ws = np.split(self.as_array, [-1], axis=1)
+        return tuple(get_stacked_medians(vss, ws))
+
+    @functools.cached_property
+    def w(self) -> float:
+        """Total weight of members."""
+        _, ws = np.split(self.as_array, [-1], axis=1)
+        return np.sum(ws)
 
     @property
     def exemplar(self) -> tuple[float, ...]:
@@ -140,11 +118,21 @@ class Cluster:
         return self.vs
 
     @functools.cached_property
+    def as_member(self) -> Member:
+        """Get cluster as a Member instance.
+
+        :return: Member instance with rgb and weight of exemplar
+        """
+        vector = np.array(self.vs + (self.w,))
+        return Member(cast(Vector, vector))
+
+    @functools.cached_property
     def _np_linalg_eig(self) -> tuple[FPArray, FPArray]:
         """Cache the value of np.linalf.eig on the covariance matrix of the cluster."""
         vss, ws = np.split(self.as_array, [-1], axis=1)
         covariance_matrix: FPArray = np_cov(vss.T, aweights=ws.flatten())
-        return np.linalg.eig(covariance_matrix)
+        eigenvalues, eigenvectors = np.linalg.eig(covariance_matrix)
+        return eigenvalues.astype(float), eigenvectors.astype(float)
 
     @functools.cached_property
     def _variance(self) -> float:
@@ -199,7 +187,7 @@ class Cluster:
 
         abc = self._axis_of_highest_variance
 
-        def get_rel_dist(rgb: _RgbF) -> float:
+        def get_rel_dist(rgb: VectorLike) -> float:
             """Get relative distance of rgb from plane Ax + By + Cz + 0."""
             return float(np.dot(abc, rgb))  # type: ignore
 
@@ -223,7 +211,7 @@ class Cluster:
         :param member: _Member instance
         :return: cost of adding member to this cluster
         """
-        return get_squared_error(member.vs, self.exemplar)
+        return _get_squared_error(member.vs, self.exemplar)
 
     @functools.cached_property
     def sse(self) -> float:
@@ -250,16 +238,16 @@ def _get_cluster_squared_error(cluster_a: Cluster, cluster_b: Cluster) -> float:
     :param cluster_b: Cluster
     :return: squared distance from cluster_a.exemplar to cluster_b.exemplar
     """
-    return get_squared_error(cluster_a.exemplar, cluster_b.exemplar)
+    return _get_squared_error(cluster_a.exemplar, cluster_b.exemplar)
 
 
 class Clusters:
     """A set of Cluster instances with cached distances and queued updates.
 
     Maintains a cached matrix of squared distances between all Cluster exemplars.
-    Created for K-medians which passes members around *before* updating exemplars, so
-    any changes identified must be staged in each Cluster's queue_add and queue_sub
-    sets then applied with _Clusters.process_queues.
+    Created for cluster algorithms which passes members around *before* updating
+    exemplars, so any changes identified must be staged in each Cluster's queue_add
+    and queue_sub sets then applied with _Clusters.process_queues.
     """
 
     def __init__(self, clusters: Iterable[Cluster]):
@@ -267,8 +255,6 @@ class Clusters:
         self.spans: DistanceMatrix[Cluster]
         self.spans = DistanceMatrix(_get_cluster_squared_error)
         self.add(*clusters)
-
-
 
     def __iter__(self) -> Iterator[Cluster]:
         return iter(self._clusters)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 220929 20:49:54
+# last modified: 221108 11:36:16
 """'Stacked' quantile functions. Close to weighted quantile functions.
 
 These functions are used to calculate quantiles of a set of values, where each value
@@ -34,21 +34,19 @@ This "weights as occurrences" interpretation has two pitfalls:
 :author: Shay Hill
 :created: 2022-09-23
 """
-from typing import Any, TypeAlias, cast, Iterable
+from typing import cast
 
 import numpy as np
-import numpy.typing as npt
 
-# TODO: refactor _FPArray to type_hints.FPArray
-_FPArray: TypeAlias = npt.NDArray[np.floating[Any]]
+from cluster_colors.type_hints import FPArray, Vector, VectorLike
 
 
 def get_stacked_quantile(
-    values: Iterable[float] | _FPArray,
-    weights: Iterable[float] | _FPArray,
+    values: VectorLike,
+    weights: VectorLike,
     quantile: float,
 ) -> float:
-    """Get a weighted quantile for a value.
+    """Get a weighted quantile for a vector of values.
 
     :param values: array of values with shape (n,)
     :param weights: array of weights where weights.shape == values.shape
@@ -59,8 +57,8 @@ def get_stacked_quantile(
     :raises ValueError: if values array is empty (after removing zero-weight values)
     :raises ValueError: if weights are not all positive
     """
-    avalues: _FPArray = np.asarray(values)
-    aweights: _FPArray = np.asarray(weights)
+    avalues: Vector = np.asarray(values)
+    aweights: Vector = np.asarray(weights)
     if avalues.shape[-1] != aweights.shape[-1]:
         raise ValueError("values and weights must be the same length")
     if quantile < 0 or quantile > 1:
@@ -76,7 +74,7 @@ def get_stacked_quantile(
     sorter = np.argsort(avalues)
     sorted_values = avalues[sorter]
     sorted_weights = aweights[sorter]
-    cum_aweights = cast(_FPArray, np.cumsum(sorted_weights))
+    cum_aweights = cast(Vector, np.cumsum(sorted_weights))
     target = cum_aweights[-1] * quantile
     index = np.searchsorted(cum_aweights, target, side="right")
     if index == 0:
@@ -88,9 +86,7 @@ def get_stacked_quantile(
     return sorted_values[index]
 
 
-def get_stacked_quantiles(
-    values: _FPArray, weights: _FPArray, quantile: float
-) -> _FPArray:
+def get_stacked_quantiles(values: FPArray, weights: FPArray, quantile: float) -> Vector:
     """Get a weighted quantile for an array of vectors.
 
     :param values: array of vectors with shape (..., m)
@@ -115,9 +111,7 @@ def get_stacked_quantiles(
     return np.array(by_axis)
 
 
-def get_stacked_median(
-    values: Iterable[float] | _FPArray, weights: Iterable[float] | _FPArray
-) -> float:
+def get_stacked_median(values: VectorLike, weights: VectorLike) -> float:
     """Get a weighted median for a value.
 
     :param values: array of values with shape (n,)
@@ -130,7 +124,7 @@ def get_stacked_median(
     return get_stacked_quantile(values, weights, 0.5)
 
 
-def get_stacked_medians(values: _FPArray, weights: _FPArray) -> _FPArray:
+def get_stacked_medians(values: FPArray, weights: FPArray) -> Vector:
     """Get a weighted median for an array of vectors.
 
     :param values: array of vectors with shape (..., m)

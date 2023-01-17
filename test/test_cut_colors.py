@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 221106 16:42:15
+# last modified: 230117 08:56:12
 """Test cut_colors.py
 
 :author: Shay Hill
@@ -12,7 +12,7 @@
 # pyright: reportUnknownParameterType=false
 
 from cluster_colors import cut_colors
-from cluster_colors import stack_vectors
+from cluster_colors import stack_vectors as sv
 import numpy as np
 
 class TestCutColors:
@@ -20,5 +20,5 @@ class TestCutColors:
     def test_cut_colors(self):
         """Call cut_colors with 100_000 random colors and pass result to stack_vectors."""
         colors = np.random.randint(0, 255, (100_000, 3), dtype=np.uint8)
-        colors = stack_colors.stack_vectors(colors)
+        colors = sv.stack_vectors(colors)
         aaa = cut_colors.cut_colors(colors, 512)

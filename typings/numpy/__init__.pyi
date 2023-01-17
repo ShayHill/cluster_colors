@@ -15,7 +15,7 @@ from types import GenericAlias, MappingProxyType, TracebackType
 from contextlib import ContextDecorator
 from numpy._pytesttester import PytestTester
 from numpy.core._internal import _ctypes
-from numpy._typing import ArrayLike, DTypeLike, NBitBase, NDArray, _128Bit, _16Bit, _256Bit, _32Bit, _64Bit, _80Bit, _8Bit, _96Bit, _ArrayLikeBool_co, _ArrayLikeBytes_co, _ArrayLikeComplex_co, _ArrayLikeDT64_co, _ArrayLikeFloat_co, _ArrayLikeInt_co, _ArrayLikeNumber_co, _ArrayLikeObject_co, _ArrayLikeStr_co, _ArrayLikeTD64_co, _ArrayLikeUInt_co, _BoolCodes, _BoolLike_co, _ByteCodes, _BytesCodes, _CDoubleCodes, _CLongDoubleCodes, _CSingleCodes, _CharLike_co, _Complex128Codes, _Complex64Codes, _ComplexLike_co, _DT64Codes, _DTypeLike, _DoubleCodes, _FiniteNestedSequence, _Float16Codes, _Float32Codes, _Float64Codes, _FloatLike_co, _GUFunc_Nin2_Nout1, _HalfCodes, _Int16Codes, _Int32Codes, _Int64Codes, _Int8Codes, _IntCCodes, _IntCodes, _IntLike_co, _IntPCodes, _LongDoubleCodes, _LongLongCodes, _NBitByte, _NBitDouble, _NBitHalf, _NBitInt, _NBitIntC, _NBitIntP, _NBitLongDouble, _NBitLongLong, _NBitShort, _NBitSingle, _NestedSequence, _NumberLike_co, _ObjectCodes, _ScalarLike_co, _Shape, _ShapeLike, _ShortCodes, _SingleCodes, _StrCodes, _SupportsArray, _SupportsDType, _TD64Codes, _TD64Like_co, _UByteCodes, _UFunc_Nin1_Nout1, _UFunc_Nin1_Nout2, _UFunc_Nin2_Nout1, _UFunc_Nin2_Nout2, _UInt16Codes, _UInt32Codes, _UInt64Codes, _UInt8Codes, _UIntCCodes, _UIntCodes, _UIntPCodes, _ULongLongCodes, _UShortCodes, _VoidCodes, _VoidDTypeLike
+from numpy._typing import ArrayLike, DTypeLike, NBitBase, NDArray, _128Bit, _16Bit, _256Bit, _32Bit, _64Bit, _80Bit, _8Bit, _96Bit, _ArrayLikeComplex_co, _ArrayLikeDT64_co, _ArrayLikeFloat_co, _ArrayLikeNumber_co, _ArrayLikeObject_co, _ArrayLikeTD64_co, _ArrayLikeUInt_co, _BoolCodes, _BoolLike_co, _ByteCodes, _BytesCodes, _CDoubleCodes, _CLongDoubleCodes, _CSingleCodes, _CharLike_co, _Complex128Codes, _Complex64Codes, _ComplexLike_co, _DT64Codes, _DTypeLike, _DoubleCodes, _FiniteNestedSequence, _Float16Codes, _Float32Codes, _Float64Codes, _FloatLike_co, _GUFunc_Nin2_Nout1, _HalfCodes, _Int16Codes, _Int32Codes, _Int64Codes, _Int8Codes, _IntCCodes, _IntCodes, _IntLike_co, _IntPCodes, _LongDoubleCodes, _LongLongCodes, _NBitByte, _NBitDouble, _NBitHalf, _NBitInt, _NBitIntC, _NBitIntP, _NBitLongDouble, _NBitLongLong, _NBitShort, _NBitSingle, _NestedSequence, _NumberLike_co, _ObjectCodes, _ScalarLike_co, _Shape, _ShapeLike, _ShortCodes, _SingleCodes, _StrCodes, _SupportsArray, _SupportsDType, _TD64Codes, _TD64Like_co, _UByteCodes, _UFunc_Nin1_Nout1, _UFunc_Nin1_Nout2, _UFunc_Nin2_Nout1, _UFunc_Nin2_Nout2, _UInt16Codes, _UInt32Codes, _UInt64Codes, _UInt8Codes, _UIntCCodes, _UIntCodes, _UIntPCodes, _ULongLongCodes, _UShortCodes, _VoidCodes, _VoidDTypeLike
 from numpy._typing._callable import _BoolBitOp, _BoolDivMod, _BoolMod, _BoolOp, _BoolSub, _BoolTrueDiv, _ComparisonOp, _ComplexOp, _FloatDivMod, _FloatMod, _FloatOp, _IntTrueDiv, _NumberOp, _SignedIntBitOp, _SignedIntDivMod, _SignedIntMod, _SignedIntOp, _TD64Div, _UnsignedIntBitOp, _UnsignedIntDivMod, _UnsignedIntMod, _UnsignedIntOp
 from numpy._typing._extended_precision import complex160 as complex160, complex192 as complex192, complex256 as complex256, complex512 as complex512, float128 as float128, float256 as float256, float80 as float80, float96 as float96, int128 as int128, int256 as int256, uint128 as uint128, uint256 as uint256
 from collections.abc import Callable, Container, Iterable, Iterator, Mapping, Sequence, Sized
@@ -50,6 +50,13 @@ from numpy.lib.type_check import asfarray as asfarray, common_type as common_typ
 from numpy.lib.ufunclike import fix as fix, isneginf as isneginf, isposinf as isposinf
 from numpy.lib.utils import byte_bounds as byte_bounds, deprecate as deprecate, deprecate_with_doc as deprecate_with_doc, get_include as get_include, info as info, issubclass_ as issubclass_, issubdtype as issubdtype, issubsctype as issubsctype, lookfor as lookfor, safe_eval as safe_eval, source as source, who as who
 from numpy.matrixlib import asmatrix as asmatrix, bmat as bmat, mat as mat
+
+from typing import cast, TypeAlias
+
+_ArrayLikeStr_co: TypeAlias = Any
+_ArrayLikeInt_co: TypeAlias = Any
+_ArrayLikeBytes_co: TypeAlias = Any
+_ArrayLikeBool_co: TypeAlias = Any
 
 if sys.version_info >= (3, 9):
     ...
@@ -4339,6 +4346,7 @@ class chararray(ndarray[_ShapeType, _CharDType]):
     def rstrip(self: _CharArray[bytes_], chars: None | _ArrayLikeBytes_co = ...) -> _CharArray[bytes_]:
         ...
     
+
     @overload
     def split(self: _CharArray[str_], sep: None | _ArrayLikeStr_co = ..., maxsplit: None | _ArrayLikeInt_co = ...) -> NDArray[object_]:
         ...
