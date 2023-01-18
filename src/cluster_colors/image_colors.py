@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 230117 16:45:20
+# last modified: 230118 08:37:20
 """Create and use cluster images from image colors
 
 :author: Shay Hill
