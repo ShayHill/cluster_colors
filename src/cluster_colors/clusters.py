@@ -12,9 +12,9 @@ import functools
 from typing import Any, Iterable, Iterator, cast
 
 import numpy as np
+from stacked_quantile import get_stacked_median, get_stacked_medians
 
 from cluster_colors.distance_matrix import DistanceMatrix
-from cluster_colors.stacked_quantile import get_stacked_median, get_stacked_medians
 from cluster_colors.type_hints import FPArray, StackedVectors, Vector, VectorLike
 
 

@@ -893,6 +893,21 @@ files = [
 ]
 
 [[package]]
+name = "stacked-quantile"
+version = "0.2.0"
+description = ""
+category = "main"
+optional = false
+python-versions = ">=3.9,<4.0"
+files = [
+    {file = "stacked_quantile-0.2.0-py3-none-any.whl", hash = "sha256:b3a5fd6d3b05b731e89376158d923a39ec95be152446c25ec2e4458ddb99c5b2"},
+    {file = "stacked_quantile-0.2.0.tar.gz", hash = "sha256:627233e362a7b65b1bfbb2efdd3fc8a6e04501342cfce41a152749dc9b42d213"},
+]
+
+[package.dependencies]
+numpy = ">=1.24.1,<2.0.0"
+
+[[package]]
 name = "termcolor"
 version = "2.2.0"
 description = "ANSI color formatting for output in terminal"
@@ -1000,4 +1015,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "9b74e08ff51568e162ab5e6fec668fb2cdee0bb8b1471cd4667805559409b4ce"
+content-hash = "1819c4f467eb5a780e98a31f9550fcb6cab513d45fe7dd3d84b6a209ae4da4db"
