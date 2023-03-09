@@ -44,11 +44,3 @@ is not guaranteed to bring you back to start. The merge methods are "public", bu
 * split this cluster recursively into five clusters (30, 30, 20, 10, 10)
 * ask for the largest cluster, and there's a tie
 * KMediansClusters will recursively merge the closest two clusters until the tie is broken
-
-
-
-
-
-
-
-

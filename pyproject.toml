@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cluster-colors"
-version = "0.2.4"
+version = "0.2.5"
 description = "Cluster color vectors with kmedians"
 authors = ["Shay Hill <shay_public@hotmail.com>"]
 license = "MIT"
@@ -23,7 +23,7 @@ pre-commit = "^2.21.0"
 
 [tool.commitizen]
 name = "cz_conventionalish"
-version = "0.2.4"
+version = "0.2.5"
 tag_format = "$version"
 version_files = [
     "pyproject.toml:^version"
