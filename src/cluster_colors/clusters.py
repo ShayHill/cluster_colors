@@ -9,13 +9,17 @@
 from __future__ import annotations
 
 import functools
-from typing import Any, Iterable, Iterator, cast
+from contextlib import suppress
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 from stacked_quantile import get_stacked_median, get_stacked_medians
 
 from cluster_colors.distance_matrix import DistanceMatrix
 from cluster_colors.type_hints import FPArray, StackedVectors, Vector, VectorLike
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
 
 
 def _get_squared_error(vector_a: VectorLike, vector_b: VectorLike) -> float:
@@ -38,8 +42,8 @@ class Member:
     colors weighing less.
     """
 
-    def __init__(self, weighted_vector: Vector):
-        """Create a new Member instance
+    def __init__(self, weighted_vector: Vector) -> None:
+        """Create a new Member instance.
 
         :param weighted_vector: a vector with a weight in the last axis
         :param ancestors: sets of ancestors to merge
@@ -94,11 +98,20 @@ class Cluster:
     """
 
     def __init__(self, members: Iterable[Member]) -> None:
-        assert members, "cannot create an empty cluster"
+        """Initialize a Cluster instance.
+
+        :param members: Member instances
+        :raise ValueError: if members is empty
+        """
+        if not members:
+            msg = "Cannot create an empty cluster"
+            raise ValueError(msg)
         self.members = set(members)
         self.exemplar_age = 0
         self.queue_add: set[Member] = set()
         self.queue_sub: set[Member] = set()
+        # cache calls to self.se
+        self._se_cache: dict[int, float] = {}
 
     @functools.cached_property
     def as_array(self) -> FPArray:
@@ -124,7 +137,7 @@ class Cluster:
         :return: total weight of members
         """
         _, ws = np.split(self.as_array, [-1], axis=1)
-        return cast(float, np.sum(ws))
+        return float(np.sum(ws))
 
     @property
     def exemplar(self) -> tuple[float, ...]:
@@ -144,7 +157,7 @@ class Cluster:
 
         :return: Member instance with rgb and weight of exemplar
         """
-        vector = np.array(self.vs + (self.w,))
+        vector = np.array((*self.vs, self.w))
         return Member(cast(Vector, vector))
 
     @functools.cached_property
@@ -207,7 +220,8 @@ class Cluster:
         stacked_quantile module for details.
         """
         if len(self.members) == 1:
-            raise ValueError("Cannot split a cluster with only one member")
+            msg = "Cannot split a cluster with only one member"
+            raise ValueError(msg)
         if len(self.members) == 2:
             a, b = self.members
             return {Cluster([a]), Cluster([b])}
@@ -235,14 +249,18 @@ class Cluster:
             right |= center
         return {Cluster(left), Cluster(right)}
 
-    @functools.lru_cache(512)
     def se(self, member: Member) -> float:
         """Get the cost of adding a member to this cluster.
 
         :param member: Member instance
         :return: cost of adding member to this cluster
         """
-        return _get_squared_error(member.vs, self.exemplar)
+        hash_ = hash(member)
+        with suppress(KeyError):
+            return self._se_cache[hash_]
+        se = _get_squared_error(member.vs, self.exemplar)
+        self._se_cache[hash_] = se
+        return se
 
     @functools.cached_property
     def sse(self) -> float:
@@ -283,7 +301,7 @@ class Clusters:
     and queue_sub sets then applied with _Clusters.process_queues.
     """
 
-    def __init__(self, clusters: Iterable[Cluster]):
+    def __init__(self, clusters: Iterable[Cluster]) -> None:
         """Create a new Clusters instance."""
         self._clusters: set[Cluster] = set()
         self.spans: DistanceMatrix[Cluster]

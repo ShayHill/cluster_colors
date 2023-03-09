@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-# last modified: 230117 16:56:31
-"""A distance matrix
+# last modified: 230309 12:24:42
+"""A distance matrix.
 
 :author: Shay Hill
 :created: 2022-10-27
 """
 import math
+from collections.abc import Callable, Hashable
 from contextlib import suppress
-from typing import Callable, Generic, Hashable, TypeVar
+from typing import Generic, TypeVar
 
 _T = TypeVar("_T", bound=Hashable)
 
@@ -18,7 +19,7 @@ class DistanceMatrix(Generic[_T]):
     Keeps matrix up to date so min and argmin will never miss a change.
     """
 
-    def __init__(self, func: Callable[[_T, _T], float]):
+    def __init__(self, func: Callable[[_T, _T], float]) -> None:
         """Initialize with a function.
 
         :param func: a commutative function
@@ -39,7 +40,8 @@ class DistanceMatrix(Generic[_T]):
             return self.cache[a, b]
         with suppress(KeyError):
             return self.cache[b, a]
-        raise KeyError(f"({a}, {b}) not in cache")
+        msg = f"({a}, {b}) not in cache"
+        raise KeyError(msg)
 
     def remove(self, item: _T):
         """Remove an item from the cache so min and argmin will not see it.
@@ -83,8 +85,7 @@ class DistanceMatrix(Generic[_T]):
 
         :return: pair of items that minimizes the function, in arbitrary order
         """
-        keymin = min(self.cache, key=self.cache.__getitem__)
-        return keymin
+        return min(self.cache, key=self.cache.__getitem__)
 
     def valmin(self) -> float:
         """Return the minimum value of the function.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 230118 10:54:03
+# last modified: 230309 12:58:24
 """Reduce colors by averaging colors with the same n-bit representation.
 
 A reasonable and deterministic way to reduce 24-bit colors (8 bits per channel,
@@ -16,10 +16,12 @@ they shouldn't have more than 256 unique values.
 # pyright: reportUnknownMemberType=false
 # pyright: reportUnknownArgumentType=false
 
+from collections.abc import Callable
 from itertools import chain
-from typing import Annotated, Callable
+from typing import Annotated
 
 import numpy as np
+from paragraphs import par
 
 from cluster_colors.type_hints import FPArray, NBits
 
@@ -35,6 +37,8 @@ def _pool(matrix: FPArray, kernel_shape: tuple[int, ...], func: _FReduce) -> FPA
     :param func: function to reduce the kernel. Must accept an array and axes as a
         tuple of floats.
     :return: pooled array
+    :raises ValueError: if the matrix is not a multiple of the kernel_shape in each
+        dimension
 
     Given an array (*dims) and a kernel shape (*kernel_dims), pool the array by func
     to each kernel_shape subarray.
@@ -48,14 +52,18 @@ def _pool(matrix: FPArray, kernel_shape: tuple[int, ...], func: _FReduce) -> FPA
     use sum, the [0,0] value of a 4x4 matrix pooled to a 2x2 matrix will be the sum
     of the 16 values in the 4x4 matrix.
     """
-    assert all(v % k == 0 for v, k in zip(matrix.shape, kernel_shape))
+    if not all(v % k == 0 for v, k in zip(matrix.shape, kernel_shape)):
+        msg = par(
+            f"""matrix shape {matrix.shape} is not a multiple of kernel shape
+            {kernel_shape}"""
+        )
+        raise ValueError(msg)
     matrix_shape = matrix.shape[: len(kernel_shape)]
     vector_shape = matrix.shape[len(kernel_shape) :]
     folded_dims = [(v // k, k) for v, k in zip(matrix_shape, kernel_shape)]
     pools_shape = tuple(chain(*folded_dims))
     reshaped = matrix.reshape(pools_shape + vector_shape)
-    result = func(reshaped, tuple(range(len(matrix_shape))))
-    return result
+    return func(reshaped, tuple(range(len(matrix_shape))))
 
 
 def _pool_8bit_cube(colors: FPArray, nbits: NBits) -> FPArray:

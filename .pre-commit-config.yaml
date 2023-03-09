@@ -105,6 +105,7 @@ repos:
     - --disable=import-error
     - --disable=too-many-arguments
     - --disable=broad-except
+    - --disable=no-name-in-module
     - --load-plugins=pylint.extensions.docparams
     - --accept-no-param-doc=n
     - --accept-no-raise-doc=n
@@ -128,13 +129,15 @@ repos:
   # PGH003 Use specific rule codes when ignoring type issues
   # PLR0913 Too many arguments to function call
   # PTH108 os.unlink should be replaced by .unlink()
+  #
+  # PLR2004 Magic value used in comparison
   rev: 'v0.0.254'
   hooks:
     - id: ruff
       exclude: "tests"
       args:
       - --select=ALL
-      - --ignore=ANN101,ANN102,ANN201,ANN202,B905,COM812,D203,D213,I001,ISC003,N802,N806,PGH003,PLR0913,PTH108
+      - --ignore=ANN101,ANN102,ANN201,ANN202,B905,COM812,D203,D213,I001,ISC003,N802,N806,PGH003,PLR0913,PTH108,PLR2004
       - --fix
 
 # reads pyproject.toml for additional config

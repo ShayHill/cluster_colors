@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 230117 17:04:55
+# last modified: 230309 12:30:58
 """Cluster stacked vectors.
 
 Designed for divisive clustering, so start with one cluster and divide until some
@@ -21,12 +21,16 @@ from __future__ import annotations
 
 from copy import deepcopy
 from operator import itemgetter
-from typing import Iterable
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from cluster_colors.clusters import Cluster, Clusters, Member
-from cluster_colors.type_hints import FPArray
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from cluster_colors.type_hints import FPArray
 
 _MAX_ITERATIONS = 1000
 
@@ -38,7 +42,7 @@ class _ClusterSplitter:
     along the axis of highest variance.
     """
 
-    def __init__(self, clusters: Clusters):
+    def __init__(self, clusters: Clusters) -> None:
         self.clusters = clusters
 
     def __call__(self, min_error_to_split: float = 0) -> bool:
@@ -70,7 +74,7 @@ class _ClusterMerger:
     Remove these clusters and add a new cluster with their combined members.
     """
 
-    def __init__(self, clusters: Clusters):
+    def __init__(self, clusters: Clusters) -> None:
         """Initialize the merger with a set of clusters.
 
         :param clusters: the clusters to merge
@@ -176,6 +180,7 @@ class KMediansClusters(Clusters):
     """Clusters for kmedians clustering."""
 
     def __init__(self, clusters: Iterable[Cluster]) -> None:
+        """Create ClusterSplitter, ClusterMerger and ClusterReassigner instances."""
         super().__init__(clusters)
         self.splitter = _ClusterSplitter(self)
         self.merger = _ClusterMerger(self)
@@ -194,7 +199,6 @@ class KMediansClusters(Clusters):
         """Reassign members until no changes occur."""
         iterations = 0
         # if any(x.queue_add for x in self.clusters):
-        # self.clusters.process_queues()
         while self.reassigner() and iterations < _MAX_ITERATIONS:
             self.process_queues()
             iterations += 1
@@ -232,10 +236,7 @@ class KMediansClusters(Clusters):
         dummy = deepcopy(self)
         while dummy.spans.valmin() > min_se and dummy.splitter():
             dummy.converge()
-        if dummy.spans.valmin() > min_se:
-            clusters_found = len(dummy)
-        else:
-            clusters_found = len(dummy) - 1
+        clusters_found = len(dummy) if dummy.spans.valmin() > min_se else len(dummy) - 1
         return self.split_to_count(clusters_found)
 
     def merge_below_se(self, min_se: float) -> bool:
@@ -264,7 +265,7 @@ class KMediansClusters(Clusters):
 
     @property
     def _has_clear_winner(self) -> bool:
-        """Is one cluster heavier than the rest?
+        """Is one cluster heavier than the rest?.
 
         :return: True if one cluster is heavier than the rest. Will almost always be
         true.

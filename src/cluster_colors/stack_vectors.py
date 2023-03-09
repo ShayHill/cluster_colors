@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 230117 17:05:45
+# last modified: 230309 13:02:52
 """Add and manipulate a vector weight axis.
 
 This project is built around combining identical vectors (presumably colors) into
@@ -27,7 +27,7 @@ what we want (so we can identify and address it outside the module).
 # pyright: reportUnknownMemberType=false
 # pyright: reportUnknownArgumentType=false
 
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 from numpy import typing as npt
@@ -43,6 +43,7 @@ def add_weight_axis(
     :param vectors: A vector of vectors with shape (..., n).
     :param weight: The weight to add to each vector in the vector of vectors.
     :return: A vector of vectors with a weight axis. (..., n + 1)
+    :raise ValueError: If the weight is not a positive number.
 
     The default weight is 255, which is the maximum value of a uint8. This will
     reflect full opacity, which makes sense when working with color vectors.
@@ -52,13 +53,15 @@ def add_weight_axis(
     more intuitive value in that case, as a vector with v[-1] == n would be a vector
     with n instances.
     """
-    assert weight > 0, "Weight must be greater than 0."
+    if weight <= 0:
+        msg = f"Weight must be greater than 0. Got {weight}."
+        raise ValueError(msg)
     ws = np.full(vectors.shape[:-1] + (1,), weight)
     return np.append(vectors, ws, axis=-1).astype(float)
 
 
 def stack_vectors(
-    vectors: npt.NDArray[np.number[Any]], weight: Optional[float] = None
+    vectors: npt.NDArray[np.number[Any]], weight: float | None = None
 ) -> StackedVectors:
     """Find and count unique vectors.
 
