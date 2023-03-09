@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 230309 13:15:32
+# last modified: 230309 13:38:30
 """Create and use cluster images from image colors.
 
 :author: Shay Hill
@@ -99,8 +99,3 @@ def get_biggest_color(stacked_colors: StackedVectors) -> tuple[float, ...]:
 #         stripes.append(
 #             .reshape(800, stripe_width, 3)
 #             .astype(np.uint8)
-#     # combine stripes into one array
-
-
-# if __name__ == "__main__":
-#     # open image, convert to array, and pass color array to get_biggest_color
