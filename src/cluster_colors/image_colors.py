@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 230118 08:37:20
+# last modified: 230309 12:19:52
 """Create and use cluster images from image colors
 
 :author: Shay Hill
@@ -11,7 +11,6 @@
 
 from __future__ import annotations
 
-import pickle
 from pathlib import Path
 
 import numpy as np
@@ -20,10 +19,31 @@ from PIL import Image
 
 from cluster_colors.cut_colors import cut_colors
 from cluster_colors.kmedians import KMediansClusters
-from cluster_colors.paths import PICKLE_DIR
+from cluster_colors.paths import CACHE_DIR
 from cluster_colors.pool_colors import pool_colors
 from cluster_colors.stack_vectors import stack_vectors
 from cluster_colors.type_hints import NBits, StackedVectors
+
+
+def _stack_image_colors_no_cache(
+    filename: Path | str, num_colors: int = 512, pool_bits: NBits = 6
+) -> StackedVectors:
+    """Stack pixel colors and reduce the number of colors in an image.
+
+    :param filename: the path to an image file
+    :param num_colors: the number of colors to reduce to. The default of 512 will
+        cluster quickly down to medium-sized clusters.
+    :param pool_bits: the number of bits to pool colors by. The default of 6 is a
+    good value. You can probably just ignore this parameter, but it's here to
+        eliminate a "magic number" from the code.
+    :return: an array of colors with weights
+    """
+    img = Image.open(filename)
+    img = img.convert("RGBA")
+    colors = stack_vectors(np.array(img))
+    colors = pool_colors(colors, pool_bits)
+    colors = cut_colors(colors, num_colors)
+    return colors
 
 
 def stack_image_colors(
@@ -32,7 +52,7 @@ def stack_image_colors(
     pool_bits: NBits = 6,
     ignore_cache: bool = False,
 ) -> StackedVectors:
-    """Stack pixel colors and reduce the number of colors in an image.
+    """Load cache or stack pixel colors and reduce the number of colors in an image.
 
     :param filename: the path to an image file
     :param num_colors: the number of colors to reduce to. The default of 512 will
@@ -46,21 +66,12 @@ def stack_image_colors(
     This is a pre-processing step for the color clustering. Stacking is necessary,
     and the pooling and cutting will allow clustering in a reasonable amount of time.
     """
-    cache_path = PICKLE_DIR / f"{Path(filename).stem}-{num_colors}.pkl"
+    cache_path = CACHE_DIR / f"{Path(filename).stem}_{num_colors}_{pool_bits}.npy"
     if not ignore_cache and cache_path.exists():
-        with open(cache_path, "rb") as f:
-            return pickle.load(f)
+        return np.load(cache_path)
 
-    img = Image.open(filename)
-    img = img.convert("RGBA")
-    colors = stack_vectors(np.array(img))
-    colors = pool_colors(colors, pool_bits)
-    colors = cut_colors(colors, num_colors)
-
-    # save the cache to PICKLE_DIR
-    with open(cache_path, "wb") as f:
-        pickle.dump(colors, f)
-
+    colors = _stack_image_colors_no_cache(filename, num_colors, pool_bits)
+    np.save(cache_path, colors)
     return colors
 
 
@@ -99,16 +110,16 @@ def get_biggest_color(stacked_colors: StackedVectors) -> tuple[float, ...]:
 #     image.save(BINARIES_DIR / f"{filename_stem}-{len(clusters)}.png")
 
 
-# if __name__ == "__main__":
-#     # open image, convert to array, and pass color array to get_biggest_color
+if __name__ == "__main__":
+    # open image, convert to array, and pass color array to get_biggest_color
 
-#     # img = Image.open("test/sugar-shack-barnes.jpg")
-#     from cluster_colors.paths import TEST_DIR, BINARIES_DIR
-#     import time
+    # img = Image.open("test/sugar-shack-barnes.jpg")
+    from cluster_colors.paths import TEST_DIR, BINARIES_DIR
+    import time
 
-#     start = time.time()
-#     colors = stack_image_colors(TEST_DIR / "sugar-shack-barnes.jpg")
-#     print(time.time() - start)
+    start = time.time()
+    colors = stack_image_colors(TEST_DIR / "sugar-shack-barnes.jpg")
+    print(time.time() - start)
 
 #     clusters = KMediansClusters.from_stacked_vectors(colors)
 #     _ = clusters.split_to_se(32**2)
