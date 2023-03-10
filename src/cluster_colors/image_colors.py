@@ -20,12 +20,12 @@ from PIL import Image
 
 from cluster_colors.cut_colors import cut_colors
 from cluster_colors.kmedians import KMediansClusters
-from cluster_colors.paths import CACHE_DIR, BINARIES_DIR
+from cluster_colors.paths import BINARIES_DIR, CACHE_DIR
 from cluster_colors.pool_colors import pool_colors
 from cluster_colors.stack_vectors import stack_vectors
 
 if TYPE_CHECKING:
-    from cluster_colors.type_hints import NBits, StackedVectors, FPArray
+    from cluster_colors.type_hints import FPArray, NBits, StackedVectors
 
 
 def _stack_image_colors_no_cache(
@@ -95,15 +95,27 @@ def get_biggest_color(stacked_colors: StackedVectors) -> tuple[float, ...]:
 
 
 def show_clusters(clusters: KMediansClusters, filename_stem: str) -> None:
+    """Create a png file with colors from the clusters.
+
+    :param clusters: the clusters to show
+    :param filename_stem: the stem of the filename to save the image as
+    :effects: saves a png file in the BINARIES_DIR
+
+    The image will be 1000 pixels wide and 800 pixels high. Stripe thickness
+    will be relative to cluster weight.
+    """
     width = 1000
     sum_weight = sum(c.w for c in clusters)
     stripes: list[FPArray] = []
     for cluster in clusters:
         stripe_width = max(round(cluster.w / sum_weight * width), 1)
-        stripes.append(np.tile(cluster.vs, (800, stripe_width)).reshape(800, stripe_width, 3).astype(np.uint8))
-    #combine stripes into one array
+        stripes.append(
+            np.tile(cluster.vs, (800, stripe_width))
+            .reshape(800, stripe_width, 3)
+            .astype(np.uint8)
+        )
+    # combine stripes into one array
     image = np.concatenate(stripes, axis=1)
 
-    # image = Image.fromarray(np.hstack(*stripes))  # type: ignore
     image = Image.fromarray(image)
     image.save(BINARIES_DIR / f"{filename_stem}-{len(clusters)}.png")
