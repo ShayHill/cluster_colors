@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# last modified: 230309 13:38:30
+# last modified: 230309 16:20:05
 """Create and use cluster images from image colors.
 
 :author: Shay Hill
@@ -20,12 +20,12 @@ from PIL import Image
 
 from cluster_colors.cut_colors import cut_colors
 from cluster_colors.kmedians import KMediansClusters
-from cluster_colors.paths import CACHE_DIR
+from cluster_colors.paths import CACHE_DIR, BINARIES_DIR
 from cluster_colors.pool_colors import pool_colors
 from cluster_colors.stack_vectors import stack_vectors
 
 if TYPE_CHECKING:
-    from cluster_colors.type_hints import NBits, StackedVectors
+    from cluster_colors.type_hints import NBits, StackedVectors, FPArray
 
 
 def _stack_image_colors_no_cache(
@@ -94,8 +94,16 @@ def get_biggest_color(stacked_colors: StackedVectors) -> tuple[float, ...]:
     return winner.exemplar
 
 
-# def show_clusters(clusters: KMediansClusters, filename_stem: str) -> None:
-#     for cluster in clusters:
-#         stripes.append(
-#             .reshape(800, stripe_width, 3)
-#             .astype(np.uint8)
+def show_clusters(clusters: KMediansClusters, filename_stem: str) -> None:
+    width = 1000
+    sum_weight = sum(c.w for c in clusters)
+    stripes: list[FPArray] = []
+    for cluster in clusters:
+        stripe_width = max(round(cluster.w / sum_weight * width), 1)
+        stripes.append(np.tile(cluster.vs, (800, stripe_width)).reshape(800, stripe_width, 3).astype(np.uint8))
+    #combine stripes into one array
+    image = np.concatenate(stripes, axis=1)
+
+    # image = Image.fromarray(np.hstack(*stripes))  # type: ignore
+    image = Image.fromarray(image)
+    image.save(BINARIES_DIR / f"{filename_stem}-{len(clusters)}.png")
