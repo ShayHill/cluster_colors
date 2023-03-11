@@ -47,29 +47,21 @@ class KMediansClusters(Clusters):
             self.process_queues()
             iterations += 1
 
-    def split_above_sse(self, max_sse: float) -> bool:
+    def split_above_sse(self, max_sse: float):
         """Split while the maximum SSE is above the threshold.
 
         :param max_sse: the SSE threshold for splitting
-        :return: True if a split occurred
         """
-        did_split = False
         while self._maybe_split_cluster(max_sse):
             self.converge()
-            did_split = True
-        return did_split
 
-    def split_to_count(self, count: int) -> bool:
+    def split_to_count(self, count: int):
         """Split clusters until len(clusters) == count.
 
         :param count: the target number of clusters
-        :return: True if a split occurred
         """
-        did_split = False
         while self._maybe_split_cluster() and len(self) < count:
             self.converge()
-            did_split = True
-        return did_split
 
     def split_to_se(self, min_se: float):
         """Split clusters until a split results in two exemplars closer than min_se.
@@ -89,29 +81,21 @@ class KMediansClusters(Clusters):
         if prev_state is not None and self.spans.valmin() < min_se:
             self.sync(prev_state)
 
-    def merge_below_se(self, min_se: float) -> bool:
+    def merge_below_se(self, min_se: float):
         """Merge clusters until the min squared error between exemplars is reached.
 
         :param min_se: the squared exemplar span for merging
-        :return: True if a merge occurred
         """
-        did_merge = False
         while self._maybe_merge_cluster(min_se):
             self.converge()
-            did_merge = True
-        return did_merge
 
-    def merge_to_count(self, count: int) -> bool:
+    def merge_to_count(self, count: int):
         """Merge clusters until len(clusters) == count.
 
         :param count: the target number of clusters
-        :return: True if a merge occurred
         """
-        did_merge = False
         while len(self) > count and self._maybe_merge_cluster():
             self.converge()
-            did_merge = True
-        return did_merge
 
     @property
     def _has_clear_winner(self) -> bool:
