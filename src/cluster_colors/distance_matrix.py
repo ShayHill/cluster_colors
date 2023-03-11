@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# last modified: 230309 12:24:42
 """A distance matrix.
 
 :author: Shay Hill

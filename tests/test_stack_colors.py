@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# last modified: 230117 08:59:13
 """Test the stack_vectors module.
 
 :author: Shay Hill

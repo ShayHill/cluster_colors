@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# last modified: 230309 12:17:11
 """Paths to project binary files.
 
 :author: Shay Hill

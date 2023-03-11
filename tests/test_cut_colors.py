@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# last modified: 230117 08:56:12
 """Test cut_colors.py
 
 :author: Shay Hill

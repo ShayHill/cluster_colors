@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# last modified: 230311 15:15:28
 """Cluster stacked vectors.
 
 Designed for divisive clustering, so start with one cluster and divide until some

@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# last modified: 230309 13:02:52
 """Add and manipulate a vector weight axis.
 
 This project is built around combining identical vectors (presumably colors) into

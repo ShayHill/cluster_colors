@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# last modified: 230117 08:54:10
 """Test functions in triangulate_image.kmedians.py
 
 :author: Shay Hill

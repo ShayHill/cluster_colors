@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# last modified: 230309 12:28:40
 """Type hints for cluster_colors.
 
 :author: Shay Hill

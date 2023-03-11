@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# last modified: 221107 17:55:53
 """Cluster colors with median cut.
 
 Repeatedly subdivide the color space by splitting along the longest axis (not

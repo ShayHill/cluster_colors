@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# last modified: 230309 12:58:24
 """Reduce colors by averaging colors with the same n-bit representation.
 
 A reasonable and deterministic way to reduce 24-bit colors (8 bits per channel,

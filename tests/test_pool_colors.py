@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# last modified: 221106 16:41:03
 """Test reduce_colors() function.
 
 :author: Shay Hill
