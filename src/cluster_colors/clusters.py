@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import functools
 from contextlib import suppress
+from operator import itemgetter
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
@@ -276,8 +277,12 @@ class Cluster:
         :return: self
         """
         if self.queue_add or self.queue_sub:
+            new_members = self.members - self.queue_sub | self.queue_add
+            # clean this up in case it is cached somewhere
             self.exemplar_age = 0
-            return Cluster(self.members - self.queue_sub | self.queue_add)
+            self.queue_add.clear()
+            self.queue_sub.clear()
+            return Cluster(new_members)
         self.exemplar_age += 1
         return self
 
@@ -340,8 +345,130 @@ class Clusters:
             self._clusters.remove(cluster)
             self.spans.remove(cluster)
 
+    def sync(self, clusters: set[Cluster]) -> None:
+        """Match the set of clusters to the given set.
+
+        :param clusters: set of clusters
+
+        This can be used to roll back changes to a previous cluster set. Come caches
+        will be lost, but this keeps it simple. If you want to capture the state of a
+        Clusters instance, just use `state = set(instance._clusters)`.
+        """
+        self.remove(*(self._clusters - clusters))
+        self.add(*(clusters - self._clusters))
+
     def process_queues(self) -> None:
         """Apply queued updates to all Cluster instances."""
         processed = {c.process_queue() for c in self._clusters}
-        self.remove(*(self._clusters - processed))
-        self.add(*(processed - self._clusters))
+        self.sync(processed)
+
+    def _maybe_split_cluster(self, min_error_to_split: float = 0) -> bool:
+        """Split the cluster with the highest SSE. Return True if a split occurred.
+
+        :param clusters: the clusters to split
+        :param min_error_to_split: the cost threshold for splitting, default 0
+        :return: Parent of split clusters if split occurred, None if no split occurred.
+
+        Could potentially make multiple splits if max_error is a tie, but this is
+        unlikely. The good news is that this will be deterministic.
+        """
+        candidates = [c for c in self if len(c.members) > 1]
+        if not candidates:
+            return False
+        graded = [(c.sse, c) for c in candidates]
+        max_error, cluster = max(graded, key=itemgetter(0))
+        if max_error < min_error_to_split:
+            return False
+        for cluster in (c for g, c in graded if g == max_error):
+            self.remove(cluster)
+            self.add(*cluster.split())
+        return True
+
+    def _maybe_merge_cluster(self, merge_below_cost: float = np.inf) -> bool:
+        """Merge the two clusters with the lowest exemplar span.
+
+        :param clusters: the clusters to merge
+        :param merge_below_cost: the cost threshold for merging, default
+            infinity
+        :return: True if a merge occurred
+
+        Could potentially make multiple merges if min_cost is a tie, but this is
+        unlikely. The good news is that this will be deterministic.
+        """
+        if len(self) < 2:
+            return False
+        min_cluster_a, min_cluster_b = self.spans.keymin()
+        min_cost = self.spans(min_cluster_a, min_cluster_b)
+        if min_cost > merge_below_cost:
+            return False
+        combined_members = min_cluster_a.members | min_cluster_b.members
+        self.remove(min_cluster_a, min_cluster_b)
+        self.add(Cluster(combined_members))
+        return True
+
+    ## Cluster Reassignment
+
+    def _get_others(self, cluster: Cluster) -> set[Cluster]:
+        """Identify other clusters with the potential to take members from cluster.
+
+        :param cluster: the cluster offering its members to other clusters
+        :return: other clusters with the potential to take members
+
+        Two optimizations:
+
+        1.  Don't compare old clusters with other old clusters.
+            These clusters are old because they have not changed since the last time
+            they were compared.
+
+        2.  Don't compare clusters with a squared distance greater than four times
+            the squared distance (twice the actual distance) to the farthest cluster
+            member.
+        """
+        if len(cluster.members) == 1:
+            return set()
+        if cluster.exemplar_age == 0:
+            others = {x for x in self._clusters if x is not cluster}
+        else:
+            others = {x for x in self._clusters if x.exemplar_age == 0}
+        if not others:
+            return others
+
+        max_se = max(cluster.se(m) for m in cluster.members)
+        return {x for x in others if self.spans(cluster, x) / 4 < max_se}
+
+    def _offer_members(self, cluster: Cluster) -> None:
+        """Look for another cluster with lower cost for members of input cluster.
+
+        :param cluster: the cluster offering its members to other clusters
+        :effect: moves members between clusters
+        """
+        others = self._get_others(cluster)
+        if not others:
+            return
+
+        safe_cost = self.spans.min(cluster) / 4
+        members = {m for m in cluster.members if cluster.se(m) > safe_cost}
+        for member in members:
+            best_cost = cluster.se(member)
+            best_cluster = cluster
+            for other in others:
+                cost = other.se(member)
+                if cost < best_cost:
+                    best_cost = cost
+                    best_cluster = other
+            if best_cluster is not cluster:
+                cluster.queue_sub.add(member)
+                best_cluster.queue_add.add(member)
+
+    def _maybe_reassign_members(self) -> bool:
+        """Pass members between clusters and update exemplars.
+
+        :return: True if any changes were made
+        """
+        if len(self) < 2:
+            return False
+        if all(x.exemplar_age > 0 for x in self._clusters):
+            return False
+        for cluster in self._clusters:
+            self._offer_members(cluster)
+        return True
