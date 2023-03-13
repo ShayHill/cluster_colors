@@ -18,12 +18,14 @@ from PIL import Image
 
 from cluster_colors.cut_colors import cut_colors
 from cluster_colors.kmedians import KMediansClusters
-from cluster_colors.paths import BINARIES_DIR, CACHE_DIR
+from cluster_colors.paths import CACHE_DIR, BINARIES_DIR
 from cluster_colors.pool_colors import pool_colors
 from cluster_colors.stack_vectors import stack_vectors
 
+from src.cluster_colors import kmedians
+
 if TYPE_CHECKING:
-    from cluster_colors.type_hints import FPArray, NBits, StackedVectors
+    from cluster_colors.type_hints import NBits, StackedVectors, FPArray
 
 
 def _stack_image_colors_no_cache(
@@ -92,16 +94,31 @@ def get_biggest_color(stacked_colors: StackedVectors) -> tuple[float, ...]:
     return winner.exemplar
 
 
-def show_clusters(clusters: KMediansClusters, filename_stem: str) -> None:
-    """Create a png file with colors from the clusters.
+def get_image_clusters(
+    filename: Path | str,
+    num_colors: int = 512,
+    pool_bits: NBits = 6,
+    *,
+    ignore_cache: bool = False,
+) -> KMediansClusters:
+    """Get all colors in an image as a single KMediansClusters instance.
 
-    :param clusters: the clusters to show
-    :param filename_stem: the stem of the filename to save the image as
-    :effects: saves a png file in the BINARIES_DIR
-
-    The image will be 1000 pixels wide and 800 pixels high. Stripe thickness
-    will be relative to cluster weight.
+    :param filename: the path to an image file
+    :param num_colors: the number of colors to reduce to. The default of 512 will
+        cluster quickly down to medium-sized clusters.
+    :param pool_bits: the number of bits to pool colors by. The default of 6 is a
+    good value. You can probably just ignore this parameter, but it's here to
+        eliminate a "magic number" from the code.
+    :param ignore_cache: if True, ignore any cached results and recompute the colors.
+    :return: a KMediansClusters instance containing all the colors in the image
     """
+    stacked_colors = stack_image_colors(
+        filename, num_colors, pool_bits, ignore_cache=ignore_cache
+    )
+    return KMediansClusters.from_stacked_vectors(stacked_colors)
+
+
+def show_clusters(clusters: KMediansClusters, filename_stem: str) -> None:
     width = 1000
     sum_weight = sum(c.w for c in clusters)
     stripes: list[FPArray] = []
@@ -115,5 +132,6 @@ def show_clusters(clusters: KMediansClusters, filename_stem: str) -> None:
     # combine stripes into one array
     image = np.concatenate(stripes, axis=1)
 
+    # image = Image.fromarray(np.hstack(*stripes))  # type: ignore
     image = Image.fromarray(image)
     image.save(BINARIES_DIR / f"{filename_stem}-{len(clusters)}.png")

@@ -21,6 +21,8 @@ from typing import TYPE_CHECKING
 
 from cluster_colors.clusters import Cluster, Clusters, Member
 
+from copy import deepcopy
+
 if TYPE_CHECKING:
     from cluster_colors.type_hints import FPArray
 
@@ -97,19 +99,32 @@ class KMediansClusters(Clusters):
         while len(self) > count and self._maybe_merge_cluster():
             self.converge()
 
-    @property
-    def _has_clear_winner(self) -> bool:
-        """Is one cluster heavier than the rest?.
-
-        :return: True if one cluster is heavier than the rest. Will almost always be
-        true.
-        """
-        if len(self) == 1:
-            return True
-        weights = [c.w for c in self]
-        return weights.count(max(weights)) == 1
-
     def merge_to_find_winner(self) -> None:
         """Merge clusters until there is a clear winner."""
         while not self._has_clear_winner and self._maybe_merge_cluster():
             self.converge()
+
+    def _pop_winner(self) -> Cluster:
+        """Pop the winner cluster and return it."""
+
+        self.merge_to_find_winner()
+        winner = max(self._clusters, key=lambda c: c.w)
+        self._clusters.remove(winner)
+        return winner
+
+    def get_rsorted_clusters(self) -> list[Cluster]:
+        """Yield clusters from largest to smallest, breaking ties.
+
+        This may not return the same clusters as the iterator, because the iterator
+        will not break ties. Tie-breaking will rarely be needed, but this method
+        makes sure things are 100% deterministis and non-arbitrary.
+
+        After popping all winners, the clusters will propably be sorted by weight,
+        but tie breaking might have combined smaller clusters into larger clusters
+        than previous winners.
+        """
+        clusters: list[Cluster] = []
+        sacrificial_copy = deepcopy(self)
+        while self._clusters:
+            clusters.append(sacrificial_copy._pop_winner())
+        return sorted(clusters, key=lambda c: c.w, reverse=True)

@@ -12,7 +12,7 @@ Advantages:
 
 Disadvantages:
 * child clusters will not necessarily contain (or only contain) the members of the parent, so this is not hierarchical (unlike agglomerative clustering where you can build a tree and then transverse it cheaply)
-* as a result of not being hierarchical, it is not straightforward to undo changes if you end up with, for instance, two near-identical exemplars. This could be implemented, but isn't implemented here.
+* as a result of not being hierarchical, it is not straightforward to undo changes if you end up with, for instance, two near-identical exemplars. I have implemented "undo" for the specific method `split_to_se`, but I have not implemented a general "undo" method. Tie-breaking strategies will always use merge instead of undo anyway, so it's important to expect that one list of members might end up in n-clusters multiple ways.
 * slows down as the number of clusters grows, not the best way to de-cluster all the way back to constituent members
 * can only use Euclidean distance; CIELab and other color-distance metrics (which aren't all they're cracked up to be anyway) will not work (that's a trade-off for some of the optimizations)
 

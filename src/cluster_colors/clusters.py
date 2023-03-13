@@ -8,6 +8,9 @@
 
 from __future__ import annotations
 
+from tempfile import tempdir
+
+
 import functools
 from contextlib import suppress
 from operator import itemgetter
@@ -361,6 +364,20 @@ class Clusters:
         """Apply queued updates to all Cluster instances."""
         processed = {c.process_queue() for c in self._clusters}
         self.sync(processed)
+
+    @property
+    def _has_clear_winner(self) -> bool:
+        """Is one cluster heavier than the rest?.
+
+        :return: True if one cluster is heavier than the rest. Will almost always be
+            true.
+
+        It is up to child classes to decide if and how to fix this situation.
+        """
+        if len(self) == 1:
+            return True
+        weights = [c.w for c in self]
+        return weights.count(max(weights)) == 1
 
     def _maybe_split_cluster(self, min_error_to_split: float = 0) -> bool:
         """Split the cluster with the highest SSE. Return True if a split occurred.
