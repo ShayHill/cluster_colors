@@ -69,22 +69,6 @@ class KMediansClusters(Clusters):
         if prev_state is not None and self.spans.valmin() < min_delta_e:
             self.sync(prev_state)
 
-    def merge_below_delta_e(self, min_delta_e: float):
-        """Merge clusters until the min delta_e distance between exemplars is reached.
-
-        :param min_delta_e: the delta-e distance for merging
-        """
-        while self._maybe_merge_cluster(min_delta_e):
-            self.converge()
-
-    def merge_to_count(self, count: int):
-        """Merge clusters until len(clusters) == count.
-
-        :param count: the target number of clusters
-        """
-        while len(self) > count and self._maybe_merge_cluster():
-            self.converge()
-
     def merge_to_find_winner(self) -> None:
         """Merge clusters until there is a clear winner."""
         while not self._has_clear_winner and self._maybe_merge_cluster():

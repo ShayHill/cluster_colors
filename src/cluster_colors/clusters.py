@@ -358,16 +358,6 @@ class Cluster:
         return self
 
 
-def _get_cluster_squared_error(cluster_a: Cluster, cluster_b: Cluster) -> float:
-    """Get squared distance between two clusters.
-
-    :param cluster_a: Cluster
-    :param cluster_b: Cluster
-    :return: squared distance from cluster_a.exemplar to cluster_b.exemplar
-    """
-    return _get_squared_error(cluster_a.exemplar, cluster_b.exemplar)
-
-
 def _get_cluster_delta_e_cie2000(cluster_a: Cluster, cluster_b: Cluster) -> float:
     """Get perceptual color distance between two clusters.
 
