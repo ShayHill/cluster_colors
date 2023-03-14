@@ -44,3 +44,24 @@ is not guaranteed to bring you back to start. The merge methods are "public", bu
 * split this cluster recursively into five clusters (30, 30, 20, 10, 10)
 * ask for the largest cluster, and there's a tie
 * KMediansClusters will recursively merge the closest two clusters until the tie is broken
+
+
+##
+
+    pip install cluster_colors
+
+## Basic usage
+
+~~~python
+from cluster_colors import get_image_clusters
+
+clusters = get_image_clusters(image_filename) # one cluster at this point
+clusters.split_to_delta_e(16)
+split_clusters = clusters.get_rsorted_clusters()
+
+colors: list[tuple[float, float, float]] = [c.exemplar for c in split_clusters]
+
+# to save the cluster exemplars as an image file
+
+show_clusters(split_clusters, "open_file_to_see_clusters")
+~~~
