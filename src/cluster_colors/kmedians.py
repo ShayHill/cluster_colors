@@ -91,7 +91,7 @@ class KMediansClusters(Clusters):
 
         This may not return the same clusters as the iterator, because the iterator
         will not break ties. Tie-breaking will rarely be needed, but this method
-        makes sure things are 100% deterministis and non-arbitrary.
+        makes sure things are 100% deterministic and non-arbitrary.
 
         After popping all winners, the clusters will propably be sorted by weight,
         but tie breaking might have combined smaller clusters into larger clusters
