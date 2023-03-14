@@ -6,30 +6,23 @@
 
 from typing import Iterable
 
-import matplotlib
 import numpy as np
-import numpy.typing as npt
 import pytest
-from matplotlib import pyplot as plt
-from PIL import Image
+from matplotlib import pyplot as plt  # type: ignore
 
 # pyright: reportPrivateUsage=false
 import cluster_colors.clusters
-from cluster_colors import kmedians
 from cluster_colors.clusters import Cluster, Member
-from cluster_colors.paths import TEST_DIR
-from cluster_colors.stack_vectors import add_weight_axis, stack_vectors
-from cluster_colors.type_hints import FPArray
+from cluster_colors.stack_vectors import  stack_vectors
 
-matplotlib.use("WebAgg")
 
 
 @pytest.fixture
-def thin_cluster() -> cluster_colors.clusters.Cluster:
+def thin_cluster() -> Cluster:
     """A cluster with all members along the (0,0,0) to (1,1,1) line."""
     colors = np.array([[x, x, x, x] for x in range(10)])
     members = cluster_colors.clusters.Member.new_members(colors)
-    return cluster_colors.rgb_clusters.Cluster(members)
+    return Cluster(members)
 
 
 class TestMemberNewMembers:
@@ -38,7 +31,7 @@ class TestMemberNewMembers:
     def test_one_member_per_color(self) -> None:
         """Return 256 members given 256 colors."""
         colors = stack_vectors(np.random.randint(1, 256, (256, 4), dtype=np.uint8))
-        members = kmedians.Member.new_members(colors)
+        members = Member.new_members(colors)
         assert len(members) == len(colors)
 
 
@@ -60,20 +53,7 @@ class TestCluster:
         cluster = Cluster(members)
         clusters = cluster.split()
         clusters = set.union(*(c.split() for c in clusters))  # type: ignore
-        # show_clusters(clusters)  # type: ignore
-
-
-class TestCallers:
-    """Test the public functions that use Clusters and Members."""
-
-    # def test_get_cluster_tuple(self) -> None:
-    #     """Return exemplar and members for a cluster."""
-    #     colors = np.array([[x, x, x, x] for x in range(1, 10)])
-    #     members = Member.new_members(colors)
-    #     cluster = Cluster(members)
-    #     exemplar, members = cluster_rgb._get_cluster_tuple(cluster)
-    #     assert exemplar == (7, 7, 7)
-    #     assert {tuple(x) for x in members} == {tuple(x) for x in colors}
+        show_clusters(clusters)  # type: ignore
 
 
 def show_clusters(clusters: Iterable[Cluster]) -> None:
@@ -87,22 +67,9 @@ def show_clusters(clusters: Iterable[Cluster]) -> None:
     colors = stack_vectors(colors)  # type: ignore
     for cluster, color in zip(clusters, colors):
         points = cluster.as_array[:, :2]
-        x, y = zip(*points)
-        plt.scatter(x, y, color=color)  # type: ignore
+        xs = [x for x, _ in points]
+        ys = [y for _, y in points]
+        plt.scatter(xs, ys, color=color)  # type: ignore
     plt.show()  # type: ignore
 
 
-# def test_resets_exemplar_age(self) -> None:
-# """Reset exemplar_age to 0 when exemplar is accessed."""
-# cluster = cluster_colors.clusters.Cluster(
-# {cluster_colors.clusters.Member((1, 2, 3), 2), cluster_colors.clusters.Member((4, 5, 6), 1)}
-# )
-# cluster.exemplar_age = 1
-# _ = cluster.exemplar
-# assert cluster.exemplar_age == 0
-
-# # class TestClusterAxis:
-# # def test_1d(self, thin_cluster) -> None:
-# # """Return the axis of the cluster."""
-# # aaa = thin_cluster.axis_of_highest_variance
-# # breakpoint()

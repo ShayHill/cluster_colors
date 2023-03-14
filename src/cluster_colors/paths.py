@@ -10,7 +10,5 @@ _PROJECT_ROOT = Path(__file__).parent.parent.parent
 
 BINARIES_DIR = _PROJECT_ROOT / "binaries"
 TEST_DIR = _PROJECT_ROOT / "tests"
-CACHE_DIR = _PROJECT_ROOT / ".cache"
 
 TEST_DIR.mkdir(parents=True, exist_ok=True)
-CACHE_DIR.mkdir(parents=True, exist_ok=True)

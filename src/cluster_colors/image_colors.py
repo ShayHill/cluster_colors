@@ -16,16 +16,15 @@ import numpy as np
 from _operator import attrgetter
 from PIL import Image
 
+from cluster_colors.config import CACHE_DIR
 from cluster_colors.cut_colors import cut_colors
 from cluster_colors.kmedians import KMediansClusters
-from cluster_colors.paths import CACHE_DIR, BINARIES_DIR
+from cluster_colors.paths import BINARIES_DIR
 from cluster_colors.pool_colors import pool_colors
 from cluster_colors.stack_vectors import stack_vectors
 
-from src.cluster_colors import kmedians
-
 if TYPE_CHECKING:
-    from cluster_colors.type_hints import NBits, StackedVectors, FPArray
+    from cluster_colors.type_hints import FPArray, NBits, StackedVectors
 
 
 def _stack_image_colors_no_cache(
@@ -119,6 +118,11 @@ def get_image_clusters(
 
 
 def show_clusters(clusters: KMediansClusters, filename_stem: str) -> None:
+    """Create a png with the exemplar of each cluster.
+
+    :param clusters: the clusters to show
+    :param filename_stem: the filename stem to use for the output file
+    """
     width = 1000
     sum_weight = sum(c.w for c in clusters)
     stripes: list[FPArray] = []
@@ -132,6 +136,5 @@ def show_clusters(clusters: KMediansClusters, filename_stem: str) -> None:
     # combine stripes into one array
     image = np.concatenate(stripes, axis=1)
 
-    # image = Image.fromarray(np.hstack(*stripes))  # type: ignore
     image = Image.fromarray(image)
     image.save(BINARIES_DIR / f"{filename_stem}-{len(clusters)}.png")

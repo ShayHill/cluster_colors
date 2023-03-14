@@ -8,13 +8,10 @@
 
 from __future__ import annotations
 
-from tempfile import tempdir
-
-
 import functools
 from contextlib import suppress
 from operator import itemgetter
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import numpy as np
 from stacked_quantile import get_stacked_median, get_stacked_medians
@@ -83,6 +80,9 @@ class Member:
         return {Member(v) for v in stacked_vectors if v[-1] > 0}
 
 
+_ClusterT = TypeVar("_ClusterT", bound="Cluster")
+
+
 class Cluster:
     """A cluster of Member instances.
 
@@ -116,6 +116,19 @@ class Cluster:
         self.queue_sub: set[Member] = set()
         # cache calls to self.se
         self._se_cache: dict[int, float] = {}
+        self._vss: FPArray | None = None
+        self._ws: FPArray | None = None
+
+    @classmethod
+    def from_stacked_vectors(
+        cls: type[_ClusterT], stacked_vectors: FPArray
+    ) -> _ClusterT:
+        """Create a Cluster instance from an iterable of colors.
+
+        :param stacked_vectors: An iterable of vectors with a weight axis
+        :return: A Cluster instance
+        """
+        return cls(Member.new_members(stacked_vectors))
 
     @functools.cached_property
     def as_array(self) -> FPArray:
@@ -125,13 +138,39 @@ class Cluster:
         """
         return np.array([member.as_array for member in self.members])
 
+    def _set_vss_ws(self):
+        """Set the cached vss and ws properties."""
+        self._vss, self._ws = np.split(self.as_array, [-1], axis=1)
+
+    @property
+    def vss(self) -> FPArray:
+        """Values for cluster members.
+
+        :return: array of values e.g., (x, y, z) for each member (x, y, z, w)
+        """
+        if self._vss is None:
+            self._set_vss_ws()
+        assert self._vss is not None
+        return self._vss
+
+    @property
+    def ws(self) -> FPArray:
+        """Weights for cluster members.
+
+        :return: array of weights e.g., (w,) for each member (x, y, z, w)
+        """
+        if self._ws is None:
+            self._set_vss_ws()
+        assert self._ws is not None
+        return self._ws
+
     @functools.cached_property
     def vs(self) -> tuple[float, ...]:
         """Values for cluster as a member instance.
 
         :return: tuple of values (x, y, z, w)
         """
-        vss, ws = np.split(self.as_array, [-1], axis=1)
+        vss, ws = self.vss, self.ws
         return tuple(get_stacked_medians(vss, ws))
 
     @functools.cached_property
@@ -140,7 +179,7 @@ class Cluster:
 
         :return: total weight of members
         """
-        _, ws = np.split(self.as_array, [-1], axis=1)
+        ws = self.ws
         return float(np.sum(ws))
 
     @property
@@ -170,7 +209,7 @@ class Cluster:
 
         :return: tuple of eigenvalues and eigenvectors
         """
-        vss, ws = np.split(self.as_array, [-1], axis=1)
+        vss, ws = self.vss, self.ws
         covariance_matrix: FPArray = np.cov(vss.T, aweights=ws.flatten())
         eigenvalues, eigenvectors = np.linalg.eig(covariance_matrix)
         return eigenvalues.astype(float), eigenvectors.astype(float)
@@ -184,18 +223,15 @@ class Cluster:
         return max(self._np_linalg_eig[0])
 
     @functools.cached_property
-    def _axis_of_highest_variance(self) -> FPArray:
+    def _direction_of_highest_variance(self) -> FPArray:
         """Get the first Eigenvector of the covariance matrix.
 
-        :return: Eigenvector of the covariance matrix
+        :return: first Eigenvector of the covariance matrix
 
-        Under a lot of conditions, this will be the axis of highest variance. There are
-        things that will break this, like all colors lying on the (1, 1, 1) line, but
-        you could use ALMOST any axis to split that cluster anyway, so it isn't worth
-        worrying about. There may be other cases where this breaks (silently makes a
-        suboptimal split) but I haven't found them yet.
+        Return the normalized eigenvector with the largest eigenvalue.
         """
-        return self._np_linalg_eig[1][np.argmax(self._np_linalg_eig[0])]
+        eigenvalues, eigenvectors = self._np_linalg_eig
+        return eigenvectors[:, np.argmax(eigenvalues)]
 
     @functools.cached_property
     def quick_error(self) -> float:
@@ -230,7 +266,7 @@ class Cluster:
             a, b = self.members
             return {Cluster([a]), Cluster([b])}
 
-        abc = self._axis_of_highest_variance
+        abc = self._direction_of_highest_variance
 
         def get_rel_dist(rgb: VectorLike) -> float:
             """Get relative distance of rgb from plane Ax + By + Cz + 0.
@@ -300,6 +336,9 @@ def _get_cluster_squared_error(cluster_a: Cluster, cluster_b: Cluster) -> float:
     return _get_squared_error(cluster_a.exemplar, cluster_b.exemplar)
 
 
+_ClustersT = TypeVar("_ClustersT", bound="Clusters")
+
+
 class Clusters:
     """A set of Cluster instances with cached distances and queued updates.
 
@@ -315,6 +354,17 @@ class Clusters:
         self.spans: DistanceMatrix[Cluster]
         self.spans = DistanceMatrix(_get_cluster_squared_error)
         self.add(*clusters)
+
+    @classmethod
+    def from_stacked_vectors(
+        cls: type[_ClustersT], stacked_vectors: FPArray
+    ) -> _ClustersT:
+        """Create a Clusters instance from an iterable of colors.
+
+        :param stacked_vectors: An iterable of vectors with a weight axis
+        :return: A Clusters instance
+        """
+        return cls({Cluster(Member.new_members(stacked_vectors))})
 
     def __iter__(self) -> Iterator[Cluster]:
         """Iterate over clusters.

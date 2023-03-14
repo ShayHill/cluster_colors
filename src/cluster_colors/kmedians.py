@@ -17,29 +17,15 @@ with very small sets was a priority.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-from cluster_colors.clusters import Cluster, Clusters, Member
-
 from copy import deepcopy
 
-if TYPE_CHECKING:
-    from cluster_colors.type_hints import FPArray
+from cluster_colors.clusters import Cluster, Clusters
 
 _MAX_ITERATIONS = 1000
 
 
 class KMediansClusters(Clusters):
     """Clusters for kmedians clustering."""
-
-    @classmethod
-    def from_stacked_vectors(cls, stacked_vectors: FPArray) -> KMediansClusters:
-        """Create a KMediansClusters from an iterable of colors.
-
-        :param stacked_vectors: An iterable of vectors with a weight axis
-        :return: A KMediansClusters instance
-        """
-        return cls({Cluster(Member.new_members(stacked_vectors))})
 
     def converge(self) -> None:
         """Reassign members until no changes occur."""
@@ -104,16 +90,20 @@ class KMediansClusters(Clusters):
         while not self._has_clear_winner and self._maybe_merge_cluster():
             self.converge()
 
-    def _pop_winner(self) -> Cluster:
-        """Pop the winner cluster and return it."""
+    def pop_winner(self) -> Cluster:
+        """Pop the winner cluster and return it.
 
+        :return: the largest cluster by weight
+        """
         self.merge_to_find_winner()
         winner = max(self._clusters, key=lambda c: c.w)
         self._clusters.remove(winner)
         return winner
 
     def get_rsorted_clusters(self) -> list[Cluster]:
-        """Yield clusters from largest to smallest, breaking ties.
+        """Return clusters from largest to smallest, breaking ties.
+
+        :return: a reverse-sorted (by weight) list of clusters
 
         This may not return the same clusters as the iterator, because the iterator
         will not break ties. Tie-breaking will rarely be needed, but this method
@@ -126,5 +116,5 @@ class KMediansClusters(Clusters):
         clusters: list[Cluster] = []
         sacrificial_copy = deepcopy(self)
         while self._clusters:
-            clusters.append(sacrificial_copy._pop_winner())
+            clusters.append(sacrificial_copy.pop_winner())
         return sorted(clusters, key=lambda c: c.w, reverse=True)
