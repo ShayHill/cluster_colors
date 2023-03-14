@@ -20,5 +20,5 @@ class TestGetBiggestColor:
         colors = image_colors.stack_image_colors(_TEST_IMAGE)
         clusters = KMediansClusters.from_stacked_vectors(colors)
 
-        _ = clusters.split_to_se(quarter_colorspace_se) 
+        _ = clusters.split_to_delta_e(quarter_colorspace_se) 
         image_colors.show_clusters(clusters, "sugar-shack-barnes")

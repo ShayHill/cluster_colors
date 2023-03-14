@@ -51,30 +51,30 @@ class KMediansClusters(Clusters):
         while self._maybe_split_cluster() and len(self) < count:
             self.converge()
 
-    def split_to_se(self, min_se: float):
-        """Split clusters until a split results in two exemplars closer than min_se.
+    def split_to_delta_e(self, min_delta_e: float):
+        """Split clusters while no two exemplars closer than min_delta_e.
 
-        :param min_se: the minimum squared distance between exemplars
+        :param min_delta_e: the minimum delta_a distance between exemplars
 
         It is difficult to know when to stop splitting, so this method splits one
         time too many then un-splits the last split.
         """
         prev_state: set[Cluster] | None = None
-        while self.spans.valmin() > min_se:
+        while self.spans.valmin() > min_delta_e:
             prev_state = set(self._clusters)
             if self._maybe_split_cluster():
                 self.converge()
             else:
                 break
-        if prev_state is not None and self.spans.valmin() < min_se:
+        if prev_state is not None and self.spans.valmin() < min_delta_e:
             self.sync(prev_state)
 
-    def merge_below_se(self, min_se: float):
-        """Merge clusters until the min squared error between exemplars is reached.
+    def merge_below_delta_e(self, min_delta_e: float):
+        """Merge clusters until the min delta_e distance between exemplars is reached.
 
-        :param min_se: the squared exemplar span for merging
+        :param min_delta_e: the delta-e distance for merging
         """
-        while self._maybe_merge_cluster(min_se):
+        while self._maybe_merge_cluster(min_delta_e):
             self.converge()
 
     def merge_to_count(self, count: int):

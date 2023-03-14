@@ -87,7 +87,7 @@ def get_biggest_color(stacked_colors: StackedVectors) -> tuple[float, ...]:
     """
     quarter_colorspace_se = 64**2
     clusters = KMediansClusters.from_stacked_vectors(stacked_colors)
-    clusters.split_to_se(quarter_colorspace_se)
+    clusters.split_to_delta_e(quarter_colorspace_se)
     clusters.merge_to_find_winner()
     winner = max(clusters, key=attrgetter("w"))
     return winner.exemplar

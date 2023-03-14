@@ -14,6 +14,9 @@ from operator import itemgetter
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import numpy as np
+from colormath.color_conversions import convert_color  # type: ignore
+from colormath.color_diff import delta_e_cie2000  # type: ignore
+from colormath.color_objects import LabColor, sRGBColor  # type: ignore
 from stacked_quantile import get_stacked_median, get_stacked_medians
 
 from cluster_colors.distance_matrix import DistanceMatrix
@@ -21,6 +24,25 @@ from cluster_colors.type_hints import FPArray, StackedVectors, Vector, VectorLik
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
+
+    import numpy.typing as npt
+
+# looks like python-colormath is abandoned. The code on PyPI will not work with the
+# latest numpy because asscaler has been removed from numpy. This kludges it.
+
+
+def patch_asscalar(a: npt.NDArray[np.float_]) -> float:
+    """Alias for np.item().
+
+    :param a: numpy array
+    :return: input array as scalar
+    """
+    return a.item()
+
+
+np.asscalar = patch_asscalar  # type: ignore
+
+# </ patch numpy asscalar for colormath
 
 
 def _get_squared_error(vector_a: VectorLike, vector_b: VectorLike) -> float:
@@ -195,6 +217,16 @@ class Cluster:
         return self.vs
 
     @functools.cached_property
+    def exemplar_lab(self) -> tuple[float, float, float]:
+        """The color description used for Cie distance.
+
+        :return: LabColor instance
+        """
+        srgb = cast(Any, sRGBColor(*self.exemplar, is_upscaled=True))
+        lab = cast(Any, convert_color(srgb, LabColor))
+        return lab.lab_l, lab.lab_a, lab.lab_b
+
+    @functools.cached_property
     def as_member(self) -> Member:
         """Get cluster as a Member instance.
 
@@ -289,16 +321,16 @@ class Cluster:
             right |= center
         return {Cluster(left), Cluster(right)}
 
-    def se(self, member: Member) -> float:
+    def se(self, member_candidate: Member) -> float:
         """Get the cost of adding a member to this cluster.
 
-        :param member: Member instance
+        :param member_candidate: Member instance
         :return: cost of adding member to this cluster
         """
-        hash_ = hash(member)
+        hash_ = hash(member_candidate)
         with suppress(KeyError):
             return self._se_cache[hash_]
-        se = _get_squared_error(member.vs, self.exemplar)
+        se = _get_squared_error(member_candidate.vs, self.exemplar)
         self._se_cache[hash_] = se
         return se
 
@@ -336,6 +368,18 @@ def _get_cluster_squared_error(cluster_a: Cluster, cluster_b: Cluster) -> float:
     return _get_squared_error(cluster_a.exemplar, cluster_b.exemplar)
 
 
+def _get_cluster_delta_e_cie2000(cluster_a: Cluster, cluster_b: Cluster) -> float:
+    """Get perceptual color distance between two clusters.
+
+    :param cluster_a: Cluster
+    :param cluster_b: Cluster
+    :return: perceptual distance from cluster_a.exemplar to cluster_b.exemplar
+    """
+    labcolor_a = cast(Any, LabColor(*cluster_a.exemplar_lab))
+    labcolor_b = cast(Any, LabColor(*cluster_b.exemplar_lab))
+    return cast(float, delta_e_cie2000(labcolor_a, labcolor_b))
+
+
 _ClustersT = TypeVar("_ClustersT", bound="Clusters")
 
 
@@ -352,7 +396,7 @@ class Clusters:
         """Create a new Clusters instance."""
         self._clusters: set[Cluster] = set()
         self.spans: DistanceMatrix[Cluster]
-        self.spans = DistanceMatrix(_get_cluster_squared_error)
+        self.spans = DistanceMatrix(_get_cluster_delta_e_cie2000)
         self.add(*clusters)
 
     @classmethod
@@ -417,12 +461,13 @@ class Clusters:
 
     @property
     def _has_clear_winner(self) -> bool:
-        """Is one cluster heavier than the rest?.
+        """Is one cluster heavier than the rest.
 
         :return: True if one cluster is heavier than the rest. Will almost always be
             true.
 
-        It is up to child classes to decide if and how to fix this situation.
+        It is up to child classes to decide if and how to fix a situation that has no
+        clear winner.
         """
         if len(self) == 1:
             return True
