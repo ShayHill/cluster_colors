@@ -13,7 +13,7 @@ import numpy as np
 import numpy.typing as npt
 from typing import Annotated
 
-from cluster_colors import cut_colors, stack_vectors as sv
+from cluster_colors import cut_colors, vector_stacker as sv
 
 import pytest
 

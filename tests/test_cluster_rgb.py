@@ -13,7 +13,7 @@ from matplotlib import pyplot as plt  # type: ignore
 # pyright: reportPrivateUsage=false
 import cluster_colors.clusters
 from cluster_colors.clusters import Cluster, Member
-from cluster_colors.stack_vectors import  stack_vectors
+from cluster_colors.vector_stacker import  stack_vectors
 
 
 

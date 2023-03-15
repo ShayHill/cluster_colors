@@ -21,7 +21,7 @@ from cluster_colors.cut_colors import cut_colors
 from cluster_colors.kmedians import KMediansClusters
 from cluster_colors.paths import BINARIES_DIR
 from cluster_colors.pool_colors import pool_colors
-from cluster_colors.stack_vectors import stack_vectors
+from cluster_colors.vector_stacker import stack_vectors
 
 if TYPE_CHECKING:
     from cluster_colors.type_hints import FPArray, NBits, StackedVectors

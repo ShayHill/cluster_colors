@@ -384,7 +384,7 @@ class Clusters:
 
     def __init__(self, clusters: Iterable[Cluster]) -> None:
         """Create a new Clusters instance."""
-        self._clusters: set[Cluster] = set()
+        self.clusters: set[Cluster] = set()
         self.spans: DistanceMatrix[Cluster]
         self.spans = DistanceMatrix(_get_cluster_delta_e_cie2000)
         self.add(*clusters)
@@ -405,14 +405,14 @@ class Clusters:
 
         :return: iterator
         """
-        return iter(self._clusters)
+        return iter(self.clusters)
 
     def __len__(self) -> int:
         """Get number of clusters.
 
         :return: number of clusters
         """
-        return len(self._clusters)
+        return len(self.clusters)
 
     def add(self, *cluster_args: Cluster) -> None:
         """Add clusters to the set.
@@ -420,7 +420,7 @@ class Clusters:
         :param cluster_args: Cluster, accepts multiple args
         """
         for cluster in cluster_args:
-            self._clusters.add(cluster)
+            self.clusters.add(cluster)
             self.spans.add(cluster)
 
     def remove(self, *cluster_args: Cluster) -> None:
@@ -429,7 +429,7 @@ class Clusters:
         :param cluster_args: a Cluster, accepts multiple args
         """
         for cluster in cluster_args:
-            self._clusters.remove(cluster)
+            self.clusters.remove(cluster)
             self.spans.remove(cluster)
 
     def sync(self, clusters: set[Cluster]) -> None:
@@ -441,12 +441,12 @@ class Clusters:
         will be lost, but this keeps it simple. If you want to capture the state of a
         Clusters instance, just use `state = set(instance._clusters)`.
         """
-        self.remove(*(self._clusters - clusters))
-        self.add(*(clusters - self._clusters))
+        self.remove(*(self.clusters - clusters))
+        self.add(*(clusters - self.clusters))
 
     def process_queues(self) -> None:
         """Apply queued updates to all Cluster instances."""
-        processed = {c.process_queue() for c in self._clusters}
+        processed = {c.process_queue() for c in self.clusters}
         self.sync(processed)
 
     @property
@@ -529,9 +529,9 @@ class Clusters:
         if len(cluster.members) == 1:
             return set()
         if cluster.exemplar_age == 0:
-            others = {x for x in self._clusters if x is not cluster}
+            others = {x for x in self.clusters if x is not cluster}
         else:
-            others = {x for x in self._clusters if x.exemplar_age == 0}
+            others = {x for x in self.clusters if x.exemplar_age == 0}
         if not others:
             return others
 
@@ -569,8 +569,8 @@ class Clusters:
         """
         if len(self) < 2:
             return False
-        if all(x.exemplar_age > 0 for x in self._clusters):
+        if all(x.exemplar_age > 0 for x in self.clusters):
             return False
-        for cluster in self._clusters:
+        for cluster in self.clusters:
             self._offer_members(cluster)
         return True

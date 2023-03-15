@@ -1,4 +1,4 @@
-"""Test the stack_vectors module.
+"""Test the vector_stacker module.
 
 :author: Shay Hill
 :created: 2022-10-18
@@ -11,7 +11,7 @@
 
 import numpy as np
 
-from cluster_colors import stack_vectors as sv
+from cluster_colors import vector_stacker as sv
 
 
 class TestAddWeightAxis:

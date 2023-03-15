@@ -61,7 +61,7 @@ class KMediansClusters(Clusters):
         """
         prev_state: set[Cluster] | None = None
         while self.spans.valmin() > min_delta_e:
-            prev_state = set(self._clusters)
+            prev_state = set(self.clusters)
             if self._maybe_split_cluster():
                 self.converge()
             else:
@@ -80,8 +80,8 @@ class KMediansClusters(Clusters):
         :return: the largest cluster by weight
         """
         self.merge_to_find_winner()
-        winner = max(self._clusters, key=lambda c: c.w)
-        self._clusters.remove(winner)
+        winner = max(self.clusters, key=lambda c: c.w)
+        self.clusters.remove(winner)
         return winner
 
     def get_rsorted_clusters(self) -> list[Cluster]:
@@ -99,6 +99,21 @@ class KMediansClusters(Clusters):
         """
         clusters: list[Cluster] = []
         sacrificial_copy = deepcopy(self)
-        while self._clusters:
+        while sacrificial_copy.clusters:
             clusters.append(sacrificial_copy.pop_winner())
         return sorted(clusters, key=lambda c: c.w, reverse=True)
+
+    def get_rsorted_exemplars(self) -> list[tuple[float, ...]]:
+        """Return clusters from largest to smallest, breaking ties.
+
+        :return: a reverse-sorted (by weight) list of clusters
+
+        This may not return the same clusters as the iterator, because the iterator
+        will not break ties. Tie-breaking will rarely be needed, but this method
+        makes sure things are 100% deterministic and non-arbitrary.
+
+        After popping all winners, the clusters will propably be sorted by weight,
+        but tie breaking might have combined smaller clusters into larger clusters
+        than previous winners.
+        """
+        return [x.exemplar for x in self.get_rsorted_clusters()]
