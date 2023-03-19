@@ -16,10 +16,11 @@ they shouldn't have more than 256 unique values.
 
 from collections.abc import Callable
 from itertools import chain
-from typing import Annotated
+from typing import Annotated, cast
 
 import numpy as np
 from paragraphs import par
+import sys
 
 from cluster_colors.type_hints import FPArray, NBits
 
@@ -120,7 +121,16 @@ def pool_colors(colors: FPArray, nbits: NBits = 6) -> FPArray:
     if nbits == 8 or len(colors) <= max_colors:
         return colors
 
-    colorspace = _fill_colorspace(colors)
+    if sys.version_info[1] >= 11:
+        # this is a bit faster in python 3.11
+        colorspace = _fill_colorspace(colors)
+    else:
+        colorspace = cast(
+            FPArray, np.zeros((256,) * (num_axes - 1) + (num_axes,), dtype=np.float64)
+        )
+        for *vs, w in colors:
+            colorspace[tuple(int(x) for x in vs)] = np.array(vs + [1]) * w
+
     colorspace = _pool_8bit_cube(colorspace, nbits)
     colors = colorspace.reshape(-1, num_axes)
     colors = colors[colors[:, -1] > 0]
