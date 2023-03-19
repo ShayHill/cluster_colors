@@ -8,7 +8,7 @@ readme = "README.md"
 packages = [{include = "cluster_colors", from = "src"}]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.10"
 numpy = "^1.24.1"
 stacked-quantile = "^0.2.0"
 paragraphs = "^0.2.0"
@@ -40,7 +40,7 @@ build-backend = "poetry.core.masonry.api"
 include = ["src"]
 exclude = ["**/__pycache__.py"]
 
-pythonVersion = "3.11"
+pythonVersion = "^3.10"
 pythonPlatform = "Any"
 
 typeCheckingMode = "strict"
