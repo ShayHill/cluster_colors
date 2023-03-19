@@ -10,7 +10,7 @@ packages = [{include = "cluster_colors", from = "src"}]
 [tool.poetry.dependencies]
 python = "^3.10"
 numpy = "^1.24.1"
-stacked-quantile = "^0.2.0"
+stacked-quantile = "^0.3.0"
 paragraphs = "^0.2.0"
 colormath = "^3.0.0"
 
@@ -19,9 +19,9 @@ pytest = "^7.2.1"
 conventionalish = "^0.1.1"
 pillow = "^9.4.0"
 matplotlib = "^3.6.3"
-tornado = "^6.2"
 pre-commit = "^2.21.0"
 black = "^23.1.0"
+tox = "^4.4.7"
 
 [tool.commitizen]
 name = "cz_conventionalish"
