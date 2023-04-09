@@ -9,9 +9,7 @@
 from __future__ import annotations
 
 import functools
-from contextlib import suppress
-from operator import itemgetter
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar, cast
 
 import numpy as np
 from colormath.color_conversions import convert_color  # type: ignore
@@ -22,27 +20,30 @@ from stacked_quantile import get_stacked_median, get_stacked_medians
 from cluster_colors.distance_matrix import DistanceMatrix
 from cluster_colors.type_hints import FPArray, StackedVectors, Vector, VectorLike
 
+_T = TypeVar("_T", bound=object)
+
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
     import numpy.typing as npt
 
-# looks like python-colormath is abandoned. The code on PyPI will not work with the
-# latest numpy because asscaler has been removed from numpy. This kludges it.
-
 
 def patch_asscalar(a: npt.NDArray[np.float_]) -> float:
-    """Alias for np.item().
+    """Alias for np.item(). Patch np.asscalar for colormath.
 
     :param a: numpy array
     :return: input array as scalar
+
+
+    looks like python-colormath is abandoned. The code on PyPI will not work with the
+    latest numpy because asscaler has been removed from numpy. This kludges it.
+    np.asscalar is not called in this module, but it is called when computing
+    delta-e.
     """
     return a.item()
 
 
 np.asscalar = patch_asscalar  # type: ignore
-
-# </ patch numpy asscalar for colormath
 
 
 def _get_squared_error(vector_a: VectorLike, vector_b: VectorLike) -> float:
@@ -136,10 +137,7 @@ class Cluster:
         self.exemplar_age = 0
         self.queue_add: set[Member] = set()
         self.queue_sub: set[Member] = set()
-        # cache calls to self.se
-        self._se_cache: dict[int, float] = {}
-        self._vss: FPArray | None = None
-        self._ws: FPArray | None = None
+        self.vss, self.ws = np.split(self.as_array, [-1], axis=1)
 
     @classmethod
     def from_stacked_vectors(
@@ -159,32 +157,6 @@ class Cluster:
         :return: array of member arrays [[x, y, z, w], [x, y, z, w], ...]
         """
         return np.array([member.as_array for member in self.members])
-
-    def _set_vss_ws(self):
-        """Set the cached vss and ws properties."""
-        self._vss, self._ws = np.split(self.as_array, [-1], axis=1)
-
-    @property
-    def vss(self) -> FPArray:
-        """Values for cluster members.
-
-        :return: array of values e.g., (x, y, z) for each member (x, y, z, w)
-        """
-        if self._vss is None:
-            self._set_vss_ws()
-        assert self._vss is not None
-        return self._vss
-
-    @property
-    def ws(self) -> FPArray:
-        """Weights for cluster members.
-
-        :return: array of weights e.g., (w,) for each member (x, y, z, w)
-        """
-        if self._ws is None:
-            self._set_vss_ws()
-        assert self._ws is not None
-        return self._ws
 
     @functools.cached_property
     def vs(self) -> tuple[float, ...]:
@@ -271,7 +243,7 @@ class Cluster:
 
         :return: product of max dimension and weight
 
-        This is the errir used to determine if a cluster should be split in the
+        This is the error used to determine if a cluster should be split in the
         cutting pre-clustering step. For that purpose, it is superior to sum squared
         error, because you *want* to isolate outliers in the cutting step.
         """
@@ -327,12 +299,7 @@ class Cluster:
         :param member_candidate: Member instance
         :return: cost of adding member to this cluster
         """
-        hash_ = hash(member_candidate)
-        with suppress(KeyError):
-            return self._se_cache[hash_]
-        se = _get_squared_error(member_candidate.vs, self.exemplar)
-        self._se_cache[hash_] = se
-        return se
+        return _get_squared_error(member_candidate.vs, self.exemplar)
 
     @functools.cached_property
     def sse(self) -> float:
@@ -367,10 +334,142 @@ def _get_cluster_delta_e_cie2000(cluster_a: Cluster, cluster_b: Cluster) -> floa
     """
     labcolor_a = cast(Any, LabColor(*cluster_a.exemplar_lab))
     labcolor_b = cast(Any, LabColor(*cluster_b.exemplar_lab))
-    return cast(float, delta_e_cie2000(labcolor_a, labcolor_b))
+    dist_ab = cast(float, delta_e_cie2000(labcolor_a, labcolor_b))
+    dist_ba = cast(float, delta_e_cie2000(labcolor_b, labcolor_a))
+    return max(dist_ab, dist_ba)
 
 
 _ClustersT = TypeVar("_ClustersT", bound="Clusters")
+
+
+class _State(NamedTuple):
+    index_: int
+    clusters: set[Cluster]
+    min_span: float
+
+
+class StatesCache:
+    """Cache the clusters and minimum inter-cluster span for each index.
+
+    A Clusters instance splits the heaviest cluster, if there is a tie, some states
+    will be skipped. E.g., given cluster weights [1, 2, 3, 4, 4], _split_clusters
+    will split both clusters with weight == 4, skipping from a 5-cluster state to a
+    7-cluster state. In this instance, state 6 will be None. State 0 will always be
+    None, so the index of a state is the number of clusters in that state.
+    """
+
+    def __init__(self, clusters: Clusters) -> None:
+        """Initialize the cache.
+
+        :param clusters: Clusters instance
+
+        If clusters instance has more than one cluster, all clusters will be combined
+        into one large cluster, so most predicates will be true for at least one
+        index (index 1). A single-cluster state has infinite inter-cluster span and
+        should not exceed any maximum-cluster requirements. This package only
+        includes predicates that pass 100% of the time with a 1-cluster state, but
+        some common predicates (cluster SSE) do not have this guarantee. Implementing
+        those will require a more sophisticated cache.
+        """
+        all_members: set[Member] = set()
+        all_members = all_members.union(*(x.members for x in clusters))
+        self.clusterss = [None, {Cluster(all_members)}]
+        self.min_spans = [None, float("inf")]
+        self.capture_state(clusters)
+        self._hard_max = len(all_members)
+
+    def capture_state(self, clusters: Clusters) -> None:
+        """Capture the state of the Clusters instance.
+
+        :param clusters: Clusters instance to capture
+        """
+        while len(self.clusterss) <= len(clusters.clusters):
+            self.clusterss.append(None)
+            self.min_spans.append(None)
+        self.clusterss[len(clusters.clusters)] = set(clusters.clusters)
+        self.min_spans[len(clusters.clusters)] = clusters.spans.valmin()
+
+    def _enumerate(self) -> Iterator[_State]:
+        """Iterate over the cached cluster states.
+
+        :return: None
+        :yield: _State tuples (index_, clusters, min_span) for each viable (non-None)
+            state.
+        """
+        for i, (clusters, min_span) in enumerate(zip(self.clusterss, self.min_spans)):
+            if clusters is not None:
+                assert min_span is not None
+                yield _State(i, clusters, min_span)
+
+    def reverse_enumerate(self) -> Iterator[_State]:
+        """Iterate backward over the cached cluster states.
+
+        :return: None
+        :yield: tuples (index_, clusters, min_span) for each viable (non-None) state.
+        """
+        enumerated = tuple(self._enumerate())
+        yield from reversed(enumerated)
+
+    def seek_ge(self, min_index: int) -> _State:
+        """Start at min_index and move right to find a non-None state.
+
+        :param min_index: minimum index to return
+        :return: (index, clusters, and min_span) at or above index = min_index
+        :raise StopIteration: if cache does not have at least min_index entries.
+        """
+        return next(s for s in self._enumerate() if s.index_ >= min_index)
+
+    def seek_le(self, max_index: int) -> _State:
+        """Start at max_index and move left to find a non-None state.
+
+        :param max_index: maximum index to return
+        :return: (index, clusters, and min_span) at or below index = max_index
+        :raise ValueError: if maximum index 0 is requested. No clusters instance will
+            ever have 0 clusters.
+        :raise StopIteration: if cache does not have at least max_index entries.
+        """
+        if max_index == 0:
+            msg = "no Clusters instance has 0 clusters"
+            raise ValueError(msg)
+        enumerated = self._enumerate()
+        prev = next(enumerated)  # will always be 1
+        if max_index == 1:
+            return prev
+        here = next(enumerated)
+        while here.index_ < max_index:
+            prev = here
+            here = next(enumerated)
+            if here.index_ == max_index:
+                return here
+        return prev
+
+    def seek_while(
+        self, max_count: int | None = None, min_span: float | None = None
+    ) -> _State:
+        """Seek to the rightmost state that satisfies the given conditions.
+
+        :param max_count: The maximum number of clusters to allow.
+        :param min_span: The minimum span to allow. If this is low and no max_count
+            is given, expect to split all the way down to singletons, which could
+            take several seconds.
+        :return: The number of clusters in the state that was found.
+        :raises StopIteration: if all states satisfy condition. In this case, we
+            won't know if we are at the rightmost state.
+        """
+        max_count = max_count or self._hard_max
+        max_count = min(max_count, self._hard_max)
+        min_span = 0 if min_span is None else min_span
+        enumerated = self._enumerate()
+        prev = next(enumerated)  # will always be 1
+        for state in enumerated:
+            if state.min_span < min_span:  # this is the first one that is too small
+                return prev
+            if state.index_ > max_count:  # overshot because tied clusters were split
+                return prev
+            if state.index_ == max_count:  # reached maximum count
+                return state
+            prev = state
+        raise StopIteration
 
 
 class Clusters:
@@ -383,11 +482,40 @@ class Clusters:
     """
 
     def __init__(self, clusters: Iterable[Cluster]) -> None:
-        """Create a new Clusters instance."""
+        """Create a new Clusters instance.
+
+        Will not merge clusters, so the minimum number of clusters will be the number
+        of clusters at instantiation.
+        """
         self.clusters: set[Cluster] = set()
         self.spans: DistanceMatrix[Cluster]
         self.spans = DistanceMatrix(_get_cluster_delta_e_cie2000)
         self.add(*clusters)
+
+        self._states = StatesCache(self)
+        self._next_to_split: set[Cluster] = set()
+
+    @property
+    def next_to_split(self) -> set[Cluster]:
+        """Return the next set of clusters to split.
+
+        :return: set of clusters with sse == max(sse)
+        :raise ValueError: if no clusters are available to split
+
+        These will be the clusters (multiple if tie, which should be rare) with the
+        highest sse.
+        """
+        self._next_to_split &= self.clusters
+        if self._next_to_split:
+            return self._next_to_split
+
+        candidates = [c for c in self if len(c.members) > 1]
+        if not candidates:
+            msg = "All clusters have only one member."
+            raise ValueError(msg)
+        max_error = max(c.sse for c in candidates)
+        self._next_to_split = {c for c in candidates if c.sse == max_error}
+        return self._next_to_split
 
     @classmethod
     def from_stacked_vectors(
@@ -449,66 +577,119 @@ class Clusters:
         processed = {c.process_queue() for c in self.clusters}
         self.sync(processed)
 
+    # ------------------------------------------------------------------------ #
+    #
+    #  split clusters
+    #
+    # ------------------------------------------------------------------------ #
+
+    def _split_cluster(self, cluster: Cluster):
+        """Split one cluster.
+
+        Overload this method to implement a custom split strategy or to add a
+        convergence step after splitting.
+        """
+        self.remove(cluster)
+        self.add(*cluster.split())
+
+    def _split_clusters(self):
+        """Split one or more clusters.
+
+        :param clusters: clusters of presumably equal error. The state after all
+            splits will be stored in self._states. Intermediate states will be stored
+            as None in split states.
+
+        The overwhelming majority of the time, this will be exactly one cluster, but
+        if more that one cluster share the same error, they will be split in
+        parallel.
+        """
+        for cluster in tuple(self.next_to_split):
+            self._split_cluster(cluster)
+        self._states.capture_state(self)
+
+    def split_until(self, max_count: int | None = None, min_span: float | None = None):
+        """Split enough to break one or both conditions, then back up one step.
+
+        :param max_count: maximum number of clusters
+        :param min_span: minimum span between clusters (in delta-e)
+        """
+        try:
+            self.sync(self._states.seek_while(max_count, min_span).clusters)
+        except StopIteration:
+            self._split_clusters()
+            self.split_until(max_count, min_span)
+
+    def split_to_at_most(self, count: int):
+        """An alias for split_until(max_count=count) to clarify intent.
+
+        :param count: maximum number of clusters
+        """
+        self.split_until(max_count=count)
+
+    def split_to_delta_e(self, min_delta_e: float):
+        """An alias for split_until(min_span=min_delta_e) to clarify intent.
+
+        :param min_delta_e: minimum span between clusters (in delta-e)
+        """
+        self.split_until(min_span=min_delta_e)
+
+    # ------------------------------------------------------------------------ #
+    #
+    #  return sorted clusters or examplars
+    #
+    # ------------------------------------------------------------------------ #
+
     @property
-    def _has_clear_winner(self) -> bool:
-        """Is one cluster heavier than the rest.
+    def _no_two_clusters_have_same_weight(self) -> bool:
+        """Do all clusters have a unique weight?
 
-        :return: True if one cluster is heavier than the rest. Will almost always be
-            true.
+        :return: True if any two clusters have the same weight
 
-        It is up to child classes to decide if and how to fix a situation that has no
-        clear winner.
+        This ensures the biggest cluster is the biggest cluster, not "one of the
+        biggest clusters". Also ensures that sorting clusters by weight is
+        deterministic and non-arbitrary.
         """
         if len(self) == 1:
             return True
-        weights = [c.w for c in self]
-        return weights.count(max(weights)) == 1
+        weights = {c.w for c in self}
+        return len(weights) == len(self)
 
-    def _maybe_split_cluster(self, min_error_to_split: float = 0) -> bool:
-        """Split the cluster with the highest SSE. Return True if a split occurred.
+    def _merge_to_break_ties(self):
+        """Revert to previous state until no two clusters have the same weight.
 
-        :param clusters: the clusters to split
-        :param min_error_to_split: the cost threshold for splitting, default 0
-        :return: Parent of split clusters if split occurred, None if no split occurred.
-
-        Could potentially make multiple splits if max_error is a tie, but this is
-        unlikely. The good news is that this will be deterministic.
+        This will always succeed because there will always be a state with only one
+        cluster.
         """
-        candidates = [c for c in self if len(c.members) > 1]
-        if not candidates:
-            return False
-        graded = [(c.sse, c) for c in candidates]
-        max_error, cluster = max(graded, key=itemgetter(0))
-        if max_error < min_error_to_split:
-            return False
-        for cluster in (c for g, c in graded if g == max_error):
-            self.remove(cluster)
-            self.add(*cluster.split())
-        return True
+        while not self._no_two_clusters_have_same_weight:
+            self.sync(self._states.seek_le(len(self) - 1).clusters)
 
-    def _maybe_merge_cluster(self, merge_below_cost: float = np.inf) -> bool:
-        """Merge the two clusters with the lowest exemplar span.
+    def get_rsorted_clusters(self) -> list[Cluster]:
+        """Return clusters from largest to smallest, breaking ties.
 
-        :param clusters: the clusters to merge
-        :param merge_below_cost: the cost threshold for merging, default
-            infinity
-        :return: True if a merge occurred
+        :return: a reverse-sorted (by weight) list of clusters
 
-        Could potentially make multiple merges if min_cost is a tie, but this is
-        unlikely. The good news is that this will be deterministic.
+        This may not return the same clusters as the iterator, because the iterator
+        will not break ties. Tie-breaking will rarely be needed, but this method
+        makes sure things are 100% deterministic and non-arbitrary.
         """
-        if len(self) < 2:
-            return False
-        min_cluster_a, min_cluster_b = self.spans.keymin()
-        min_cost = self.spans(min_cluster_a, min_cluster_b)
-        if min_cost > merge_below_cost:
-            return False
-        combined_members = min_cluster_a.members | min_cluster_b.members
-        self.remove(min_cluster_a, min_cluster_b)
-        self.add(Cluster(combined_members))
-        return True
+        return sorted(self.clusters, key=lambda c: c.w, reverse=True)
 
-    ## Cluster Reassignment
+    def get_rsorted_exemplars(self) -> list[tuple[float, ...]]:
+        """Return clusters from largest to smallest, breaking ties.
+
+        :return: a reverse-sorted (by weight) list of cluster exemplars
+
+        This may not return the same clusters as the iterator, because the iterator
+        will not break ties. Tie-breaking will rarely be needed, but this method
+        makes sure things are 100% deterministic and non-arbitrary.
+        """
+        return [x.exemplar for x in self.get_rsorted_clusters()]
+
+    # ------------------------------------------------------------------------ #
+    #
+    #  compare clusters and queue members for reassignment
+    #
+    # ------------------------------------------------------------------------ #
 
     def _get_others(self, cluster: Cluster) -> set[Cluster]:
         """Identify other clusters with the potential to take members from cluster.
@@ -548,7 +729,7 @@ class Clusters:
         if not others:
             return
 
-        safe_cost = self.spans.min(cluster) / 4
+        safe_cost = self.spans.min_from_item(cluster) / 4
         members = {m for m in cluster.members if cluster.se(m) > safe_cost}
         for member in members:
             best_cost = cluster.se(member)

@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
-from _operator import attrgetter
 from PIL import Image
 
 from cluster_colors.config import CACHE_DIR
@@ -88,9 +87,7 @@ def get_biggest_color(stacked_colors: StackedVectors) -> tuple[float, ...]:
     quarter_colorspace_se = 64**2
     clusters = KMediansClusters.from_stacked_vectors(stacked_colors)
     clusters.split_to_delta_e(quarter_colorspace_se)
-    clusters.merge_to_find_winner()
-    winner = max(clusters, key=attrgetter("w"))
-    return winner.exemplar
+    return clusters.get_rsorted_exemplars()[0]
 
 
 def get_image_clusters(

@@ -60,7 +60,7 @@ class DistanceMatrix(Generic[_T]):
             self.cache[item, other] = self.func(item, other)
         self._items.add(item)
 
-    def min(self, a: _T) -> float:
+    def min_from_item(self, a: _T) -> float:
         """Return the minimum value of the function for a given item.
 
         :param a: item to find the minimum for
