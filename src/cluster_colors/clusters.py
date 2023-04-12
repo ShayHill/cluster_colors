@@ -755,3 +755,19 @@ class Clusters:
         for cluster in self.clusters:
             self._offer_members(cluster)
         return True
+
+    # ------------------------------------------------------------------------ #
+    #
+    #  treat it like a cluster
+    #
+    # ------------------------------------------------------------------------ #
+
+    @property
+    def as_one_cluster(self) -> Cluster:
+        """Return a cluster that contains all members of all clusters.
+
+        :return: a cluster that contains all members of all clusters
+
+        This is a pathway to a Clusters instance sum weight, sum exemplar, etc.
+        """
+        return next(iter(self._states.seek_ge(1).clusters))
