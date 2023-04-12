@@ -770,4 +770,6 @@ class Clusters:
 
         This is a pathway to a Clusters instance sum weight, sum exemplar, etc.
         """
-        return next(iter(self._states.seek_ge(1).clusters))
+        members_list = [x.members for x in self.clusters]
+        return Cluster(members_list[0].union(*members_list[1:]))
+        # return next(iter(self._states.seek_ge(1).clusters))
