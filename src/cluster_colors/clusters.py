@@ -455,17 +455,22 @@ class StatesCache:
         :return: The number of clusters in the state that was found.
         :raises StopIteration: if all states satisfy condition. In this case, we
             won't know if we are at the rightmost state.
+
+        When max count is one, prev will only ever have the value None. It is not
+        possible to fail other tests in this state, so the `prev or state` return
+        values will never be returned when prev is still None. This is because a
+        single cluster has a minimum span of infinity.
         """
         max_count = max_count or self._hard_max
         max_count = min(max_count, self._hard_max)
         min_span = 0 if min_span is None else min_span
         enumerated = self._enumerate()
-        prev = next(enumerated)  # will always be 1
+        prev = None
         for state in enumerated:
             if state.min_span < min_span:  # this is the first one that is too small
-                return prev
+                return prev or state
             if state.index_ > max_count:  # overshot because tied clusters were split
-                return prev
+                return prev or state
             if state.index_ == max_count:  # reached maximum count
                 return state
             prev = state
@@ -772,4 +777,3 @@ class Clusters:
         """
         members_list = [x.members for x in self.clusters]
         return Cluster(members_list[0].union(*members_list[1:]))
-        # return next(iter(self._states.seek_ge(1).clusters))
