@@ -17,7 +17,7 @@ from PIL import Image
 
 from cluster_colors.config import CACHE_DIR
 from cluster_colors.cut_colors import cut_colors
-from cluster_colors.kmedians import KMediansClusters
+from cluster_colors.kmedians import KMedSupercluster
 from cluster_colors.paths import BINARIES_DIR
 from cluster_colors.pool_colors import pool_colors
 from cluster_colors.vector_stacker import stack_vectors
@@ -85,7 +85,7 @@ def get_biggest_color(stacked_colors: StackedVectors) -> tuple[float, ...]:
     Cluster into large clusters, then return the exemplar of the biggest cluster.
     """
     quarter_colorspace_se = 64**2
-    clusters = KMediansClusters.from_stacked_vectors(stacked_colors)
+    clusters = KMedSupercluster.from_stacked_vectors(stacked_colors)
     clusters.split_to_delta_e(quarter_colorspace_se)
     return clusters.get_rsorted_exemplars()[0]
 
@@ -96,8 +96,8 @@ def get_image_clusters(
     pool_bits: NBits = 6,
     *,
     ignore_cache: bool = False,
-) -> KMediansClusters:
-    """Get all colors in an image as a single KMediansClusters instance.
+) -> KMedSupercluster:
+    """Get all colors in an image as a single KMedSupercluster instance.
 
     :param filename: the path to an image file
     :param num_colors: the number of colors to reduce to. The default of 512 will
@@ -106,24 +106,24 @@ def get_image_clusters(
     good value. You can probably just ignore this parameter, but it's here to
         eliminate a "magic number" from the code.
     :param ignore_cache: if True, ignore any cached results and recompute the colors.
-    :return: a KMediansClusters instance containing all the colors in the image
+    :return: a KMedSupercluster instance containing all the colors in the image
     """
     stacked_colors = stack_image_colors(
         filename, num_colors, pool_bits, ignore_cache=ignore_cache
     )
-    return KMediansClusters.from_stacked_vectors(stacked_colors)
+    return KMedSupercluster.from_stacked_vectors(stacked_colors)
 
 
-def show_clusters(clusters: KMediansClusters, filename_stem: str) -> None:
+def show_clusters(supercluster: KMedSupercluster, filename_stem: str) -> None:
     """Create a png with the exemplar of each cluster.
 
-    :param clusters: the clusters to show
+    :param supercluster: the clusters to show
     :param filename_stem: the filename stem to use for the output file
     """
     width = 1000
-    sum_weight = sum(c.w for c in clusters)
+    sum_weight = sum(c.w for c in supercluster)
     stripes: list[FPArray] = []
-    for cluster in clusters:
+    for cluster in supercluster:
         stripe_width = max(round(cluster.w / sum_weight * width), 1)
         stripes.append(
             np.tile(cluster.vs, (800, stripe_width))
@@ -134,4 +134,4 @@ def show_clusters(clusters: KMediansClusters, filename_stem: str) -> None:
     image = np.concatenate(stripes, axis=1)
 
     image = Image.fromarray(image)
-    image.save(BINARIES_DIR / f"{filename_stem}-{len(clusters)}.png")
+    image.save(BINARIES_DIR / f"{filename_stem}-{len(supercluster)}.png")

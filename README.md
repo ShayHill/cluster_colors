@@ -2,7 +2,7 @@ Divisive (but not hierarchical) clustering.
 
 Slow, but clustering exactly how I want it. Iteratively split cluster with highest SSE. Splits are used to find new exemplars, which are thrown into k-medians with existing exemplars. Takes pretty extreme measures to avoid not only non-determinism but also non-arbitrary-ism:
 
-* a Clusters instance, when asked to split, will split the cluster with the highest SSE. If there is a tie, the Clusters instance will not arbitrarily decide between the tied clusters, but will instead split all clusters tied for max SSE. This means there is a small chance you will not be able to split a group of colors into exactly n clusters.
+* a Supercluster instance, when asked to split, will split the cluster with the highest SSE. If there is a tie, the Clusters instance will not arbitrarily decide between the tied clusters, but will instead split all clusters tied for max SSE. This means there is a small chance you will not be able to split a group of colors into exactly n clusters.
 * delta-e is non-commutative, so delta-e is computed *twice* for each distance (a -> b and b -> a). The maximum of these two is used. This doubles the time of an already slow calculation, but delta-e is only used for distances between clusters, and this module is designed to work with small numbers of clusters (Agglomerative clustering may be a better bet if you want to use small clusters.)
 
 Advantages:
@@ -32,12 +32,12 @@ This clustering is designed for questions like "what are the five dominant color
 
 ### k-medians clustering
 
-`KMediansClusters`: split and merge (undo split) clusters.
+`KMedSupercluster`: split and merge (undo split) clusters.
 
 * start with one cluster with 100 members
 * split this cluster recursively into five clusters (30, 30, 20, 10, 10)
 * ask for the largest cluster, and there's a tie
-* KMediansClusters will recursively unsplit clusters until all ties are broken. This will *rarely* be needed.
+* KMedSupercluster will recursively unsplit clusters until all ties are broken. This will *rarely* be needed.
 
 
 ## Installation

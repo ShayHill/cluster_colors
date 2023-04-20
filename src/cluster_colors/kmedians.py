@@ -17,12 +17,12 @@ with very small sets was a priority.
 
 from __future__ import annotations
 
-from cluster_colors.clusters import Cluster, Clusters
+from cluster_colors.clusters import Cluster, Supercluster
 
 _MAX_ITERATIONS = 1000
 
 
-class KMediansClusters(Clusters):
+class KMedSupercluster(Supercluster):
     """Clusters for kmedians clustering."""
 
     def converge(self) -> None:

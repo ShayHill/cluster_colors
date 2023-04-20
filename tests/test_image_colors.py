@@ -2,7 +2,7 @@
 
 from cluster_colors import image_colors
 from cluster_colors.paths import TEST_DIR
-from cluster_colors.kmedians import KMediansClusters
+from cluster_colors.kmedians import KMedSupercluster
 
 _TEST_IMAGE = TEST_DIR / 'sugar-shack-barnes.jpg'
 
@@ -18,7 +18,7 @@ class TestGetBiggestColor:
         """Test display_biggest_color function."""
         quarter_colorspace_se = 16**2
         colors = image_colors.stack_image_colors(_TEST_IMAGE)
-        clusters = KMediansClusters.from_stacked_vectors(colors)
+        clusters = KMedSupercluster.from_stacked_vectors(colors)
 
         _ = clusters.split_to_delta_e(quarter_colorspace_se) 
         image_colors.show_clusters(clusters, "sugar-shack-barnes")

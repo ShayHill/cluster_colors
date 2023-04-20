@@ -59,7 +59,7 @@ class TestCluster:
 def show_clusters(clusters: Iterable[Cluster]) -> None:
     """Display clusters as a scatter plot.
 
-    :param clusters: list of sets of (x, y) coordinates
+    :param supercluster: list of sets of (x, y) coordinates
 
     Make each cluster a different color.
     """

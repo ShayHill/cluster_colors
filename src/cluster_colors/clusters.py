@@ -339,7 +339,7 @@ def _get_cluster_delta_e_cie2000(cluster_a: Cluster, cluster_b: Cluster) -> floa
     return max(dist_ab, dist_ba)
 
 
-_ClustersT = TypeVar("_ClustersT", bound="Clusters")
+_SuperclusterT = TypeVar("_SuperclusterT", bound="Supercluster")
 
 
 class _State(NamedTuple):
@@ -351,17 +351,17 @@ class _State(NamedTuple):
 class StatesCache:
     """Cache the clusters and minimum inter-cluster span for each index.
 
-    A Clusters instance splits the heaviest cluster, if there is a tie, some states
+    A Supercluster instance splits the heaviest cluster, if there is a tie, some states
     will be skipped. E.g., given cluster weights [1, 2, 3, 4, 4], _split_clusters
     will split both clusters with weight == 4, skipping from a 5-cluster state to a
     7-cluster state. In this instance, state 6 will be None. State 0 will always be
     None, so the index of a state is the number of clusters in that state.
     """
 
-    def __init__(self, clusters: Clusters) -> None:
+    def __init__(self, supercluster: Supercluster) -> None:
         """Initialize the cache.
 
-        :param clusters: Clusters instance
+        :param supercluster: Supercluster instance
 
         If clusters instance has more than one cluster, all clusters will be combined
         into one large cluster, so most predicates will be true for at least one
@@ -371,23 +371,24 @@ class StatesCache:
         some common predicates (cluster SSE) do not have this guarantee. Implementing
         those will require a more sophisticated cache.
         """
+        #TODO: join all clusters at the beginning. Do not preserve input divisions
         all_members: set[Member] = set()
-        all_members = all_members.union(*(x.members for x in clusters))
-        self.clusterss = [None, {Cluster(all_members)}]
+        all_members = all_members.union(*(x.members for x in supercluster))
+        self.cluster_sets = [None, {Cluster(all_members)}]
         self.min_spans = [None, float("inf")]
-        self.capture_state(clusters)
+        self.capture_state(supercluster)
         self._hard_max = len(all_members)
 
-    def capture_state(self, clusters: Clusters) -> None:
-        """Capture the state of the Clusters instance.
+    def capture_state(self, supercluster: Supercluster) -> None:
+        """Capture the state of the Supercluster instance.
 
-        :param clusters: Clusters instance to capture
+        :param supercluster: Supercluster instance to capture
         """
-        while len(self.clusterss) <= len(clusters.clusters):
-            self.clusterss.append(None)
+        while len(self.cluster_sets) <= len(supercluster.clusters):
+            self.cluster_sets.append(None)
             self.min_spans.append(None)
-        self.clusterss[len(clusters.clusters)] = set(clusters.clusters)
-        self.min_spans[len(clusters.clusters)] = clusters.spans.valmin()
+        self.cluster_sets[len(supercluster.clusters)] = set(supercluster.clusters)
+        self.min_spans[len(supercluster.clusters)] = supercluster.spans.valmin()
 
     def _enumerate(self) -> Iterator[_State]:
         """Iterate over the cached cluster states.
@@ -396,7 +397,7 @@ class StatesCache:
         :yield: _State tuples (index_, clusters, min_span) for each viable (non-None)
             state.
         """
-        for i, (clusters, min_span) in enumerate(zip(self.clusterss, self.min_spans)):
+        for i, (clusters, min_span) in enumerate(zip(self.cluster_sets, self.min_spans)):
             if clusters is not None:
                 assert min_span is not None
                 yield _State(i, clusters, min_span)
@@ -429,7 +430,7 @@ class StatesCache:
         :raise StopIteration: if cache does not have at least max_index entries.
         """
         if max_index == 0:
-            msg = "no Clusters instance has 0 clusters"
+            msg = "no Supercluster instance has 0 clusters"
             raise ValueError(msg)
         enumerated = self._enumerate()
         prev = next(enumerated)  # will always be 1
@@ -477,17 +478,17 @@ class StatesCache:
         raise StopIteration
 
 
-class Clusters:
+class Supercluster:
     """A set of Cluster instances with cached distances and queued updates.
 
     Maintains a cached matrix of squared distances between all Cluster exemplars.
     Created for cluster algorithms which passes members around *before* updating
     exemplars, so any changes identified must be staged in each Cluster's queue_add
-    and queue_sub sets then applied with _Clusters.process_queues.
+    and queue_sub sets then applied with _Supercluster.process_queues.
     """
 
     def __init__(self, clusters: Iterable[Cluster]) -> None:
-        """Create a new Clusters instance.
+        """Create a new Supercluster instance.
 
         Will not merge clusters, so the minimum number of clusters will be the number
         of clusters at instantiation.
@@ -524,12 +525,12 @@ class Clusters:
 
     @classmethod
     def from_stacked_vectors(
-        cls: type[_ClustersT], stacked_vectors: FPArray
-    ) -> _ClustersT:
-        """Create a Clusters instance from an iterable of colors.
+        cls: type[_SuperclusterT], stacked_vectors: FPArray
+    ) -> _SuperclusterT:
+        """Create a Supercluster instance from an iterable of colors.
 
         :param stacked_vectors: An iterable of vectors with a weight axis
-        :return: A Clusters instance
+        :return: A Supercluster instance
         """
         return cls({Cluster(Member.new_members(stacked_vectors))})
 
@@ -572,7 +573,7 @@ class Clusters:
 
         This can be used to roll back changes to a previous cluster set. Come caches
         will be lost, but this keeps it simple. If you want to capture the state of a
-        Clusters instance, just use `state = set(instance._clusters)`.
+        Supercluster instance, just use `state = set(instance._clusters)`.
         """
         self.remove(*(self.clusters - clusters))
         self.add(*(clusters - self.clusters))
@@ -773,7 +774,7 @@ class Clusters:
 
         :return: a cluster that contains all members of all clusters
 
-        This is a pathway to a Clusters instance sum weight, sum exemplar, etc.
+        This is a pathway to a Supercluster instance sum weight, sum exemplar, etc.
         """
         members_list = [x.members for x in self.clusters]
         return Cluster(members_list[0].union(*members_list[1:]))
