@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar, cast, Annotated
 
 import numpy as np
 from colormath.color_conversions import convert_color  # type: ignore
@@ -142,11 +142,10 @@ class Cluster:
         self.queue_add: set[Member] = set()
         self.queue_sub: set[Member] = set()
         self.vss, self.ws = np.split(self.as_array, [-1], axis=1)
+        self._children: Annotated[set[Cluster], "doubleton"] | None = None
 
     @classmethod
-    def from_stacked_vectors(
-        cls: type[_ClusterT], stacked_vectors: FPArray
-    ) -> _ClusterT:
+    def from_stacked_vectors(cls, stacked_vectors: FPArray) -> Cluster:
         """Create a Cluster instance from an iterable of colors.
 
         :param stacked_vectors: An iterable of vectors with a weight axis
@@ -276,7 +275,7 @@ class Cluster:
         except StopIteration:
             return False
 
-    def split(self) -> set[Cluster]:
+    def split(self) -> Annotated[set[Cluster], "doubleton"]:
         """Split cluster into two clusters.
 
         :return: two new clusters
@@ -291,6 +290,9 @@ class Cluster:
             b) exactly on the splitting plane.
         See stacked_quantile module for details, but that case is covered here.
         """
+        if self._children is not None:
+            return self._children
+
         if not self.is_splittable:
             msg = "Cannot split a cluster with only one weighted member"
             raise ValueError(msg)
@@ -316,7 +318,8 @@ class Cluster:
             left |= center
         else:
             right |= center
-        return {Cluster(left), Cluster(right)}
+        self._children = {Cluster(left), Cluster(right)}
+        return set(self._children)
 
     def se(self, member_candidate: Member) -> float:
         """Get the cost of adding a member to this cluster.
@@ -369,6 +372,7 @@ _SuperclusterT = TypeVar("_SuperclusterT", bound="Supercluster")
 
 
 class _State(NamedTuple):
+    """The information required to revert to a previous state."""
     index_: int
     clusters: set[Cluster]
     min_span: float
@@ -644,8 +648,7 @@ class Supercluster:
     # ------------------------------------------------------------------------ #
 
     def _split_cluster(self, cluster: Cluster):
-        """Split one cluster.
-        """
+        """Split one cluster."""
         self.exchange({cluster}, cluster.split())
 
     def _split_clusters(self):
