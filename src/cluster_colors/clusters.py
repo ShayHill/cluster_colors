@@ -70,6 +70,7 @@ class Member:
         """Create a new Member instance.
 
         :param weighted_vector: a vector with a weight in the last axis
+            (r, g, b, w)
         :param ancestors: sets of ancestors to merge
         """
         self.as_array = weighted_vector
@@ -79,6 +80,7 @@ class Member:
         """All value axes of the Member as a tuple.
 
         :return: tuple of values that are not the weight
+            the (r, g, b) in (r, g, b, w)
         """
         return tuple(self.as_array[:-1])
 
@@ -86,7 +88,8 @@ class Member:
     def w(self) -> float:
         """Weight of the Member.
 
-        :return: weight of the Member
+        :return: weight of the Member 
+            the w in (r, g, b, w)
         """
         return self.as_array[-1]
 
@@ -100,7 +103,7 @@ class Member:
         Silently drop colors without weight. It is possible to return an empty set if
         no colors have weight > 0.
         """
-        return {Member(v) for v in stacked_vectors if v[-1] > 0}
+        return {Member(v) for v in stacked_vectors if v[-1]}
 
 
 _ClusterT = TypeVar("_ClusterT", bound="Cluster")
@@ -121,7 +124,7 @@ class Cluster:
     the next round.
 
     This is almost a frozen class, but the queue_add, queue_sub, and exemplar_age
-    attributes are mutable.
+    attributes are intended to be mutable.
     """
 
     def __init__(self, members: Iterable[Member]) -> None:
@@ -146,7 +149,9 @@ class Cluster:
         """Create a Cluster instance from an iterable of colors.
 
         :param stacked_vectors: An iterable of vectors with a weight axis
-        :return: A Cluster instance
+            [(r0, g0, b0, w0), (r1, g1, b1, w1), ...]
+        :return: A Cluster instance with members
+            {Member([r0, g0, b0, w0]), Member([r1, g1, b1, w1]), ...}
         """
         return cls(Member.new_members(stacked_vectors))
 
@@ -159,13 +164,22 @@ class Cluster:
         return np.array([member.as_array for member in self.members])
 
     @functools.cached_property
+    def as_member(self) -> Member:
+        """Get cluster as a Member instance.
+
+        :return: Member instance with median rgb and sum weight of cluster members
+        """
+        vss, ws = self.vss, self.ws
+        rgbw = np.array([*get_stacked_medians(vss, ws), np.sum(ws)])
+        return Member(rgbw)
+
+    @functools.cached_property
     def vs(self) -> tuple[float, ...]:
         """Values for cluster as a member instance.
 
-        :return: tuple of values (x, y, z, w)
+        :return: tuple of values (r, g, b) from self.as_member((r, g, b, w))
         """
-        vss, ws = self.vss, self.ws
-        return tuple(get_stacked_medians(vss, ws))
+        return self.as_member.vs
 
     @functools.cached_property
     def w(self) -> float:
@@ -173,8 +187,7 @@ class Cluster:
 
         :return: total weight of members
         """
-        ws = self.ws
-        return float(np.sum(ws))
+        return self.as_member.w
 
     @property
     def exemplar(self) -> tuple[float, ...]:
@@ -198,14 +211,6 @@ class Cluster:
         lab = cast(Any, convert_color(srgb, LabColor))
         return lab.lab_l, lab.lab_a, lab.lab_b
 
-    @functools.cached_property
-    def as_member(self) -> Member:
-        """Get cluster as a Member instance.
-
-        :return: Member instance with rgb and weight of exemplar
-        """
-        vector = np.array((*self.vs, self.w))
-        return Member(cast(Vector, vector))
 
     @functools.cached_property
     def _np_linalg_eig(self) -> tuple[FPArray, FPArray]:
@@ -260,8 +265,11 @@ class Cluster:
         Split the cluster into two clusters by the plane perpendicular to the axis of
         highest variance.
 
-        The splitting is a bit funny due to particulars of the stacked median. See
-        stacked_quantile module for details.
+        The splitting is a bit funny due to innate characteristice of the stacked
+        median. It is possible to get a split with members
+            a) on one side of the splitting plane; and
+            b) exactly on the splitting plane.
+        See stacked_quantile module for details, but that case is covered here.
         """
         if len(self.members) == 1:
             msg = "Cannot split a cluster with only one member"
@@ -312,11 +320,12 @@ class Cluster:
     def process_queue(self) -> Cluster:
         """Process the add and sub queues and update exemplars.
 
-        :return: self
+        :return: self or a new cluster
         """
         if self.queue_add or self.queue_sub:
             new_members = self.members - self.queue_sub | self.queue_add
-            # clean this up in case it is cached somewhere
+            # reset state in case we revert back to this cluster with
+            # Supercluster.sync()
             self.exemplar_age = 0
             self.queue_add.clear()
             self.queue_sub.clear()
