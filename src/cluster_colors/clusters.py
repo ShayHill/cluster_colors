@@ -256,6 +256,22 @@ class Cluster:
             return 0.0
         return self._variance * self.w
 
+    @functools.cached_property
+    def is_splittable(self) -> bool:
+        """Can the cluster be split?
+
+        If the cluster contains at least two members with non-zero weight, those
+        members will end up in separate clusters when split. 0-weight members are
+        tracers. A cluster with only tracers is invalid.
+        """
+        qualifying_members = (x for x in self.members if x.w)
+        try:
+            _ = next(qualifying_members)
+            _ = next(qualifying_members)
+            return True
+        except StopIteration:
+            return False
+
     def split(self) -> set[Cluster]:
         """Split cluster into two clusters.
 
@@ -271,12 +287,9 @@ class Cluster:
             b) exactly on the splitting plane.
         See stacked_quantile module for details, but that case is covered here.
         """
-        if len(self.members) == 1:
-            msg = "Cannot split a cluster with only one member"
+        if not self.is_splittable:
+            msg = "Cannot split a cluster with only one weighted member"
             raise ValueError(msg)
-        if len(self.members) == 2:
-            a, b = self.members
-            return {Cluster([a]), Cluster([b])}
 
         abc = self._direction_of_highest_variance
 
@@ -524,9 +537,9 @@ class Supercluster:
         if self._next_to_split:
             return self._next_to_split
 
-        candidates = [c for c in self if len(c.members) > 1]
+        candidates = [c for c in self if c.is_splittable]
         if not candidates:
-            msg = "All clusters have only one member."
+            msg = "No clusters can be split"
             raise ValueError(msg)
         max_error = max(c.sse for c in candidates)
         self._next_to_split = {c for c in candidates if c.sse == max_error}
