@@ -12,7 +12,7 @@ class TestSupercluster:
         """Test the as_one_cluster method."""
         one_cluster = Cluster.from_stacked_vectors(np.array([[1, 2, 3, 1], [4, 5, 6, 1]]))
         two_cluster = Cluster.from_stacked_vectors(np.array([[7, 8, 9, 1], [1, 3, 5, 1]]))
-        clusters = Supercluster([one_cluster])
+        clusters = Supercluster(one_cluster)
         clusters.add(two_cluster)
-        assert len(clusters.as_one_cluster.members) == 4
+        assert len(clusters.as_cluster.members) == 4
 

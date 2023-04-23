@@ -155,6 +155,10 @@ class Cluster:
         """
         return cls(Member.new_members(stacked_vectors))
 
+    def __iter__(self) -> Iterator[Member]:
+        """Iterate over members."""
+        return iter(self.members)
+
     @functools.cached_property
     def as_array(self) -> FPArray:
         """Cluster as an array of member arrays.
@@ -173,7 +177,7 @@ class Cluster:
         rgbw = np.array([*get_stacked_medians(vss, ws), np.sum(ws)])
         return Member(rgbw)
 
-    @functools.cached_property
+    @property
     def vs(self) -> tuple[float, ...]:
         """Values for cluster as a member instance.
 
@@ -181,7 +185,7 @@ class Cluster:
         """
         return self.as_member.vs
 
-    @functools.cached_property
+    @property
     def w(self) -> float:
         """Total weight of members.
 
@@ -385,21 +389,18 @@ class StatesCache:
 
         :param supercluster: Supercluster instance
 
-        If clusters instance has more than one cluster, all clusters will be combined
-        into one large cluster, so most predicates will be true for at least one
-        index (index 1). A single-cluster state has infinite inter-cluster span and
-        should not exceed any maximum-cluster requirements. This package only
-        includes predicates that pass 100% of the time with a 1-cluster state, but
-        some common predicates (cluster SSE) do not have this guarantee. Implementing
-        those will require a more sophisticated cache.
+        Most predicates will be true for at least one index (index 1). A
+        single-cluster state has infinite inter-cluster span and should not exceed
+        any maximum-cluster requirements. This package only includes predicates that
+        pass 100% of the time with a 1-cluster state, but some common predicates
+        (cluster SSE) do not have this guarantee. Implementing those will require a
+        more intricate cache.
         """
-        #TODO: join all clusters at the beginning. Do not preserve input divisions
-        all_members: set[Member] = set()
-        all_members = all_members.union(*(x.members for x in supercluster))
-        self.cluster_sets = [None, {Cluster(all_members)}]
-        self.min_spans = [None, float("inf")]
+        self.cluster_sets: list[set[Cluster] | None]  = []
+        self.min_spans: list[float | None] = []
         self.capture_state(supercluster)
-        self._hard_max = len(all_members)
+        cluster, = supercluster.clusters
+        self._hard_max = sum(1 for x in cluster if x.w)
 
     def capture_state(self, supercluster: Supercluster) -> None:
         """Capture the state of the Supercluster instance.
@@ -412,7 +413,7 @@ class StatesCache:
         self.cluster_sets[len(supercluster.clusters)] = set(supercluster.clusters)
         self.min_spans[len(supercluster.clusters)] = supercluster.spans.valmin()
 
-    def _enumerate(self) -> Iterator[_State]:
+    def enumerate(self) -> Iterator[_State]:
         """Iterate over the cached cluster states.
 
         :return: None
@@ -430,7 +431,7 @@ class StatesCache:
         :return: None
         :yield: tuples (index_, clusters, min_span) for each viable (non-None) state.
         """
-        enumerated = tuple(self._enumerate())
+        enumerated = tuple(self.enumerate())
         yield from reversed(enumerated)
 
     def seek_ge(self, min_index: int) -> _State:
@@ -440,7 +441,7 @@ class StatesCache:
         :return: (index, clusters, and min_span) at or above index = min_index
         :raise StopIteration: if cache does not have at least min_index entries.
         """
-        return next(s for s in self._enumerate() if s.index_ >= min_index)
+        return next(s for s in self.enumerate() if s.index_ >= min_index)
 
     def seek_le(self, max_index: int) -> _State:
         """Start at max_index and move left to find a non-None state.
@@ -454,7 +455,7 @@ class StatesCache:
         if max_index == 0:
             msg = "no Supercluster instance has 0 clusters"
             raise ValueError(msg)
-        enumerated = self._enumerate()
+        enumerated = self.enumerate()
         prev = next(enumerated)  # will always be 1
         if max_index == 1:
             return prev
@@ -487,7 +488,7 @@ class StatesCache:
         max_count = max_count or self._hard_max
         max_count = min(max_count, self._hard_max)
         min_span = 0 if min_span is None else min_span
-        enumerated = self._enumerate()
+        enumerated = self.enumerate()
         prev = None
         for state in enumerated:
             if state.min_span < min_span:  # this is the first one that is too small
@@ -504,21 +505,22 @@ class Supercluster:
     """A set of Cluster instances with cached distances and queued updates.
 
     Maintains a cached matrix of squared distances between all Cluster exemplars.
-    Created for cluster algorithms which passes members around *before* updating
+    Created for cluster algorithms which pass members around *before* updating
     exemplars, so any changes identified must be staged in each Cluster's queue_add
-    and queue_sub sets then applied with _Supercluster.process_queues.
+    and queue_sub sets then applied with Supercluster.process_queues.
     """
 
-    def __init__(self, clusters: Iterable[Cluster]) -> None:
+    def __init__(self, *members: Iterable[Member]) -> None:
         """Create a new Supercluster instance.
 
-        Will not merge clusters, so the minimum number of clusters will be the number
-        of clusters at instantiation.
+        :param members: initial members. All are combined into one cluster. Multiple
+        arguments allowed.
         """
+        all_members = set(members[0]).union(*(set(ms) for ms in members[1:]))
         self.clusters: set[Cluster] = set()
         self.spans: DistanceMatrix[Cluster]
         self.spans = DistanceMatrix(_get_cluster_delta_e_cie2000)
-        self.add(*clusters)
+        self.add(Cluster(all_members))
 
         self._states = StatesCache(self)
         self._next_to_split: set[Cluster] = set()
@@ -554,7 +556,7 @@ class Supercluster:
         :param stacked_vectors: An iterable of vectors with a weight axis
         :return: A Supercluster instance
         """
-        return cls({Cluster(Member.new_members(stacked_vectors))})
+        return cls(Member.new_members(stacked_vectors))
 
     def __iter__(self) -> Iterator[Cluster]:
         """Iterate over clusters.
@@ -791,12 +793,12 @@ class Supercluster:
     # ------------------------------------------------------------------------ #
 
     @property
-    def as_one_cluster(self) -> Cluster:
+    def as_cluster(self) -> Cluster:
         """Return a cluster that contains all members of all clusters.
 
         :return: a cluster that contains all members of all clusters
 
         This is a pathway to a Supercluster instance sum weight, sum exemplar, etc.
         """
-        members_list = [x.members for x in self.clusters]
-        return Cluster(members_list[0].union(*members_list[1:]))
+        cluster, = next(self._states.enumerate()).clusters
+        return cluster
