@@ -16,6 +16,7 @@ from colormath.color_conversions import convert_color  # type: ignore
 from colormath.color_diff import delta_e_cie2000  # type: ignore
 from colormath.color_objects import LabColor, sRGBColor  # type: ignore
 from stacked_quantile import get_stacked_median, get_stacked_medians
+from paragraphs import par
 
 from cluster_colors.distance_matrix import DistanceMatrix
 from cluster_colors.type_hints import FPArray, StackedVectors, Vector, VectorLike
@@ -88,7 +89,7 @@ class Member:
     def w(self) -> float:
         """Weight of the Member.
 
-        :return: weight of the Member 
+        :return: weight of the Member
             the w in (r, g, b, w)
         """
         return self.as_array[-1]
@@ -214,7 +215,6 @@ class Cluster:
         srgb = cast(Any, sRGBColor(*self.exemplar, is_upscaled=True))
         lab = cast(Any, convert_color(srgb, LabColor))
         return lab.lab_l, lab.lab_a, lab.lab_b
-
 
     @functools.cached_property
     def _np_linalg_eig(self) -> tuple[FPArray, FPArray]:
@@ -396,10 +396,10 @@ class StatesCache:
         (cluster SSE) do not have this guarantee. Implementing those will require a
         more intricate cache.
         """
-        self.cluster_sets: list[set[Cluster] | None]  = []
+        self.cluster_sets: list[set[Cluster] | None] = []
         self.min_spans: list[float | None] = []
         self.capture_state(supercluster)
-        cluster, = supercluster.clusters
+        (cluster,) = supercluster.clusters
         self._hard_max = sum(1 for x in cluster if x.w)
 
     def capture_state(self, supercluster: Supercluster) -> None:
@@ -420,7 +420,9 @@ class StatesCache:
         :yield: _State tuples (index_, clusters, min_span) for each viable (non-None)
             state.
         """
-        for i, (clusters, min_span) in enumerate(zip(self.cluster_sets, self.min_spans)):
+        for i, (clusters, min_span) in enumerate(
+            zip(self.cluster_sets, self.min_spans)
+        ):
             if clusters is not None:
                 assert min_span is not None
                 yield _State(i, clusters, min_span)
@@ -501,6 +503,15 @@ class StatesCache:
         raise StopIteration
 
 
+def _get_all_members(*cluster_args: Cluster) -> set[Member]:
+    """Return the union of all members of the given clusters."""
+    try:
+        member_sets = (x.members for x in cluster_args)
+        return next(member_sets).union(*member_sets)
+    except StopIteration:
+        return set()
+
+
 class Supercluster:
     """A set of Cluster instances with cached distances and queued updates.
 
@@ -520,7 +531,7 @@ class Supercluster:
         self.clusters: set[Cluster] = set()
         self.spans: DistanceMatrix[Cluster]
         self.spans = DistanceMatrix(_get_cluster_delta_e_cie2000)
-        self.add(Cluster(all_members))
+        self._add(Cluster(all_members))
 
         self._states = StatesCache(self)
         self._next_to_split: set[Cluster] = set()
@@ -572,7 +583,7 @@ class Supercluster:
         """
         return len(self.clusters)
 
-    def add(self, *cluster_args: Cluster) -> None:
+    def _add(self, *cluster_args: Cluster) -> None:
         """Add clusters to the set.
 
         :param cluster_args: Cluster, accepts multiple args
@@ -581,7 +592,7 @@ class Supercluster:
             self.clusters.add(cluster)
             self.spans.add(cluster)
 
-    def remove(self, *cluster_args: Cluster) -> None:
+    def _remove(self, *cluster_args: Cluster) -> None:
         """Remove clusters from the set and update the distance matrix.
 
         :param cluster_args: a Cluster, accepts multiple args
@@ -589,6 +600,26 @@ class Supercluster:
         for cluster in cluster_args:
             self.clusters.remove(cluster)
             self.spans.remove(cluster)
+
+    def exchange(
+        self, subtractions: Iterable[Cluster], additions: Iterable[Cluster]
+    ) -> None:
+        """Exchange clusters in the set and update the distance matrix.
+
+        :param subtractions: clusters to remove
+        :param additions: clusters to add
+        :raise ValueError: if the exchange would result in a missing members
+        """
+        sub_members = _get_all_members(*subtractions)
+        add_members = _get_all_members(*additions)
+        if sub_members != add_members:
+            msg = par(
+                """Exchange would result in missing or extra members: {sub_members}
+                != {add_members}"""
+            )
+            raise ValueError(msg)
+        self._remove(*subtractions)
+        self._add(*additions)
 
     def sync(self, clusters: set[Cluster]) -> None:
         """Match the set of clusters to the given set.
@@ -599,8 +630,7 @@ class Supercluster:
         will be lost, but this keeps it simple. If you want to capture the state of a
         Supercluster instance, just use `state = set(instance._clusters)`.
         """
-        self.remove(*(self.clusters - clusters))
-        self.add(*(clusters - self.clusters))
+        self.exchange(self.clusters - clusters, clusters - self.clusters)
 
     def process_queues(self) -> None:
         """Apply queued updates to all Cluster instances."""
@@ -619,8 +649,7 @@ class Supercluster:
         Overload this method to implement a custom split strategy or to add a
         convergence step after splitting.
         """
-        self.remove(cluster)
-        self.add(*cluster.split())
+        self.exchange({cluster}, cluster.split())
 
     def _split_clusters(self):
         """Split one or more clusters.
@@ -800,5 +829,5 @@ class Supercluster:
 
         This is a pathway to a Supercluster instance sum weight, sum exemplar, etc.
         """
-        cluster, = next(self._states.enumerate()).clusters
+        (cluster,) = next(self._states.enumerate()).clusters
         return cluster

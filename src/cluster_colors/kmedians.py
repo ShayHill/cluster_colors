@@ -35,6 +35,6 @@ class KMedSupercluster(Supercluster):
 
     def _split_cluster(self, cluster: Cluster):
         """Split one cluster."""
-        self.remove(cluster)
-        self.add(*cluster.split())
+        # TODO: move converge to split_clusters, not split_cluster
+        self.exchange([cluster],  cluster.split())
         self.converge()
