@@ -645,9 +645,6 @@ class Supercluster:
 
     def _split_cluster(self, cluster: Cluster):
         """Split one cluster.
-
-        Overload this method to implement a custom split strategy or to add a
-        convergence step after splitting.
         """
         self.exchange({cluster}, cluster.split())
 
@@ -661,6 +658,9 @@ class Supercluster:
         The overwhelming majority of the time, this will be exactly one cluster, but
         if more that one cluster share the same error, they will be split in
         parallel.
+
+        Overload this method to implement a custom split strategy or to add a
+        convergence step after splitting.
         """
         for cluster in tuple(self.next_to_split):
             self._split_cluster(cluster)

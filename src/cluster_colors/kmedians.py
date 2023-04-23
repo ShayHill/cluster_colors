@@ -17,7 +17,7 @@ with very small sets was a priority.
 
 from __future__ import annotations
 
-from cluster_colors.clusters import Cluster, Supercluster
+from cluster_colors.clusters import Supercluster
 
 _MAX_ITERATIONS = 1000
 
@@ -33,8 +33,21 @@ class KMedSupercluster(Supercluster):
             self.process_queues()
             iterations += 1
 
-    def _split_cluster(self, cluster: Cluster):
-        """Split one cluster."""
-        # TODO: move converge to split_clusters, not split_cluster
-        self.exchange([cluster],  cluster.split())
-        self.converge()
+    def _split_clusters(self):
+        """Split one or more clusters.
+
+        :param clusters: clusters of presumably equal error. The state after all
+            splits will be stored in self._states. Intermediate states will be stored
+            as None in split states.
+
+        The overwhelming majority of the time, this will be exactly one cluster, but
+        if more that one cluster share the same error, they will be split in
+        parallel.
+
+        Overload this method to implement a custom split strategy or to add a
+        convergence step after splitting.
+        """
+        for cluster in tuple(self.next_to_split):
+            self._split_cluster(cluster)
+        self.converge
+        self._states.capture_state(self)
