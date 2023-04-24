@@ -165,7 +165,7 @@ class Cluster:
 
         :return: array of member arrays [[x, y, z, w], [x, y, z, w], ...]
         """
-        return np.array([member.as_array for member in self.members])
+        return np.array([m.as_array for m in self.members if m.w])
 
     @functools.cached_property
     def as_member(self) -> Member:
