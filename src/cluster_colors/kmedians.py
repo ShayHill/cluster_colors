@@ -49,5 +49,5 @@ class KMedSupercluster(Supercluster):
         """
         for cluster in tuple(self.next_to_split):
             self._split_cluster(cluster)
-        self.converge
+        self.converge()
         self._states.capture_state(self)

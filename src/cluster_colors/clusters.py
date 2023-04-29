@@ -9,17 +9,16 @@
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar, cast, Annotated
+from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, TypeVar, cast
 
 import numpy as np
 from colormath.color_conversions import convert_color  # type: ignore
 from colormath.color_diff import delta_e_cie2000  # type: ignore
 from colormath.color_objects import LabColor, sRGBColor  # type: ignore
-from stacked_quantile import get_stacked_median, get_stacked_medians
 from paragraphs import par
+from stacked_quantile import get_stacked_median, get_stacked_medians
 
 from cluster_colors.distance_matrix import DistanceMatrix
-from cluster_colors.type_hints import FPArray, StackedVectors, Vector, VectorLike
 
 _T = TypeVar("_T", bound=object)
 
@@ -27,6 +26,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
     import numpy.typing as npt
+
+    from cluster_colors.type_hints import FPArray, StackedVectors, Vector, VectorLike
 
 
 def patch_asscalar(a: npt.NDArray[np.float_]) -> float:
@@ -156,7 +157,11 @@ class Cluster:
         return cls(Member.new_members(stacked_vectors))
 
     def __iter__(self) -> Iterator[Member]:
-        """Iterate over members."""
+        """Iterate over members.
+
+        :return: None
+        :yield: Members
+        """
         return iter(self.members)
 
     @functools.cached_property
@@ -263,6 +268,8 @@ class Cluster:
     def is_splittable(self) -> bool:
         """Can the cluster be split?
 
+        :return: True if the cluster can be split
+
         If the cluster contains at least two members with non-zero weight, those
         members will end up in separate clusters when split. 0-weight members are
         tracers. A cluster with only tracers is invalid.
@@ -271,9 +278,10 @@ class Cluster:
         try:
             _ = next(qualifying_members)
             _ = next(qualifying_members)
-            return True
         except StopIteration:
             return False
+        else:
+            return True
 
     def split(self) -> Annotated[set[Cluster], "doubleton"]:
         """Split cluster into two clusters.
@@ -344,8 +352,7 @@ class Cluster:
         """
         if self.queue_add or self.queue_sub:
             new_members = self.members - self.queue_sub | self.queue_add
-            # reset state in case we revert back to this cluster with
-            # Supercluster.sync()
+            # reset state in case we revert back to this cluster with sync()
             self.exemplar_age = 0
             self.queue_add.clear()
             self.queue_sub.clear()
@@ -373,6 +380,7 @@ _SuperclusterT = TypeVar("_SuperclusterT", bound="Supercluster")
 
 class _State(NamedTuple):
     """The information required to revert to a previous state."""
+
     index_: int
     clusters: set[Cluster]
     min_span: float
@@ -417,7 +425,7 @@ class StatesCache:
         self.cluster_sets[len(supercluster.clusters)] = set(supercluster.clusters)
         self.min_spans[len(supercluster.clusters)] = supercluster.spans.valmin()
 
-    def enumerate(self) -> Iterator[_State]:
+    def fwd_enumerate(self) -> Iterator[_State]:
         """Iterate over the cached cluster states.
 
         :return: None
@@ -431,13 +439,13 @@ class StatesCache:
                 assert min_span is not None
                 yield _State(i, clusters, min_span)
 
-    def reverse_enumerate(self) -> Iterator[_State]:
+    def rev_enumerate(self) -> Iterator[_State]:
         """Iterate backward over the cached cluster states.
 
         :return: None
         :yield: tuples (index_, clusters, min_span) for each viable (non-None) state.
         """
-        enumerated = tuple(self.enumerate())
+        enumerated = tuple(self.fwd_enumerate())
         yield from reversed(enumerated)
 
     def seek_ge(self, min_index: int) -> _State:
@@ -447,7 +455,7 @@ class StatesCache:
         :return: (index, clusters, and min_span) at or above index = min_index
         :raise StopIteration: if cache does not have at least min_index entries.
         """
-        return next(s for s in self.enumerate() if s.index_ >= min_index)
+        return next(s for s in self.fwd_enumerate() if s.index_ >= min_index)
 
     def seek_le(self, max_index: int) -> _State:
         """Start at max_index and move left to find a non-None state.
@@ -461,7 +469,7 @@ class StatesCache:
         if max_index == 0:
             msg = "no Supercluster instance has 0 clusters"
             raise ValueError(msg)
-        enumerated = self.enumerate()
+        enumerated = self.fwd_enumerate()
         prev = next(enumerated)  # will always be 1
         if max_index == 1:
             return prev
@@ -494,7 +502,7 @@ class StatesCache:
         max_count = max_count or self._hard_max
         max_count = min(max_count, self._hard_max)
         min_span = 0 if min_span is None else min_span
-        enumerated = self.enumerate()
+        enumerated = self.fwd_enumerate()
         prev = None
         for state in enumerated:
             if state.min_span < min_span:  # this is the first one that is too small
@@ -508,12 +516,18 @@ class StatesCache:
 
 
 def _get_all_members(*cluster_args: Cluster) -> set[Member]:
-    """Return the union of all members of the given clusters."""
+    """Return the union of all members of the given clusters.
+
+    :param cluster_args: The clusters to get members from.
+    :return: The union of all members of the given clusters.
+    """
     try:
         member_sets = (x.members for x in cluster_args)
-        return next(member_sets).union(*member_sets)
+        all_members = next(member_sets).union(*member_sets)
     except StopIteration:
         return set()
+    else:
+        return all_members
 
 
 class Supercluster:
@@ -832,5 +846,5 @@ class Supercluster:
 
         This is a pathway to a Supercluster instance sum weight, sum exemplar, etc.
         """
-        (cluster,) = next(self._states.enumerate()).clusters
+        (cluster,) = next(self._states.fwd_enumerate()).clusters
         return cluster

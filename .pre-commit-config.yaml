@@ -93,7 +93,7 @@ repos:
     exclude: "tests"
     name: pylint
     args:
-    - --good-names=i,j,_,e,f,vs,w,a,b,ws,se
+    - --good-names=i,j,_,e,f,vs,w,a,b,ws,se,r,g,b
     - --disable=too-many-instance-attributes
     - --disable=too-many-locals
     - --disable=too-few-public-methods

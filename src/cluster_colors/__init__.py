@@ -10,5 +10,5 @@ __all__ = [
     "get_image_clusters",
     "stack_vectors",
     "show_clusters",
-    "new_tracer"
+    "new_tracer",
 ]

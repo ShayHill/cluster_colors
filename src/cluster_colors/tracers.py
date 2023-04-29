@@ -22,6 +22,7 @@ and `in` comparisons to identify the tracer.
 """
 
 import numpy as np
+
 from cluster_colors.clusters import Member
 
 # Color members are created by averaging pixels where each pixel is a 3-tuple of
@@ -29,10 +30,11 @@ from cluster_colors.clusters import Member
 # (Unless you average > 68 billion pixels.) Any integer +- _DX is guaranteed to *not*
 # exist as any pixel in an existing color member.
 
-_DX = 1 / 2 ** 36
+_DX = 1 / 2**36
 
 if 1 - _DX == 1:
-    raise ValueError("This library is not compatible with your system.")
+    _MSG = "This library is not compatible with your system."
+    raise ValueError(_MSG)
 
 
 def new_tracer(rgb: tuple[int, int, int]) -> Member:
@@ -46,5 +48,5 @@ def new_tracer(rgb: tuple[int, int, int]) -> Member:
     meaningful difference in exemplar selection.
     """
     r, g, b = rgb
-    r = r - _DX if r else r + _DX
-    return Member(np.array([r, g, b, 0]))
+    close_to_r = r - _DX if r else r + _DX
+    return Member(np.array([close_to_r, g, b, 0]))
