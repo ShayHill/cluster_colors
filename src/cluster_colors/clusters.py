@@ -222,9 +222,9 @@ class Cluster:
         :return: tuple of eigenvalues and eigenvectors
         """
         vss, ws = self.vss, self.ws
-        covariance_matrix: FPArray = np.cov(vss.T, aweights=ws.flatten())
+        covariance_matrix: FPArray = np.cov(vss.T, fweights=ws.flatten())
         eigenvalues, eigenvectors = np.linalg.eig(covariance_matrix)
-        return eigenvalues.astype(float), eigenvectors.astype(float)
+        return np.real(eigenvalues), np.real(eigenvectors)
 
     @functools.cached_property
     def _variance(self) -> float:
