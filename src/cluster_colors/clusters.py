@@ -9,12 +9,10 @@
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, TypeVar, cast
+from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, TypeVar
 
 import numpy as np
-from colormath.color_conversions import convert_color  # type: ignore
-from colormath.color_diff import delta_e_cie2000  # type: ignore
-from colormath.color_objects import LabColor, sRGBColor  # type: ignore
+from basic_colormath import get_delta_e_lab, rgb_to_lab
 from paragraphs import par
 from stacked_quantile import get_stacked_median, get_stacked_medians
 
@@ -214,11 +212,9 @@ class Cluster:
     def exemplar_lab(self) -> tuple[float, float, float]:
         """The color description used for Cie distance.
 
-        :return: LabColor instance
+        :return: Lab color tuple
         """
-        srgb = cast(Any, sRGBColor(*self.exemplar, is_upscaled=True))
-        lab = cast(Any, convert_color(srgb, LabColor))
-        return lab.lab_l, lab.lab_a, lab.lab_b
+        return rgb_to_lab(self.exemplar)
 
     @functools.cached_property
     def _np_linalg_eig(self) -> tuple[FPArray, FPArray]:
@@ -368,10 +364,10 @@ def _get_cluster_delta_e_cie2000(cluster_a: Cluster, cluster_b: Cluster) -> floa
     :param cluster_b: Cluster
     :return: perceptual distance from cluster_a.exemplar to cluster_b.exemplar
     """
-    labcolor_a = cast(Any, LabColor(*cluster_a.exemplar_lab))
-    labcolor_b = cast(Any, LabColor(*cluster_b.exemplar_lab))
-    dist_ab = cast(float, delta_e_cie2000(labcolor_a, labcolor_b))
-    dist_ba = cast(float, delta_e_cie2000(labcolor_b, labcolor_a))
+    labcolor_a = cluster_a.exemplar_lab
+    labcolor_b = cluster_b.exemplar_lab
+    dist_ab = get_delta_e_lab(labcolor_a, labcolor_b)
+    dist_ba = get_delta_e_lab(labcolor_b, labcolor_a)
     return max(dist_ab, dist_ba)
 
 

@@ -12,7 +12,7 @@ python = "^3.10"
 numpy = "^1.24.1"
 stacked-quantile = "^0.3.0"
 paragraphs = "^0.2.0"
-colormath = "^3.0.0"
+basic-colormath = "^0.1.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.2.1"
