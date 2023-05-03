@@ -4,57 +4,35 @@
 :created: 2023-01-17
 """
 
-# pyright: reportUnknownMemberType=false
-
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, TypeVar
+from typing import TYPE_CHECKING, Annotated, NamedTuple, TypeVar
 
 import numpy as np
-from basic_colormath import get_delta_e_lab, rgb_to_lab
+from basic_colormath import get_delta_e_lab, rgb_to_lab, get_sqeuclidean
 from paragraphs import par
 from stacked_quantile import get_stacked_median, get_stacked_medians
 
 from cluster_colors.distance_matrix import DistanceMatrix
 
 _T = TypeVar("_T", bound=object)
+_RGB = tuple[float, float, float]
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
-    import numpy.typing as npt
-
     from cluster_colors.type_hints import FPArray, StackedVectors, Vector, VectorLike
 
 
-def patch_asscalar(a: npt.NDArray[np.float_]) -> float:
-    """Alias for np.item(). Patch np.asscalar for colormath.
-
-    :param a: numpy array
-    :return: input array as scalar
-
-
-    looks like python-colormath is abandoned. The code on PyPI will not work with the
-    latest numpy because asscaler has been removed from numpy. This kludges it.
-    np.asscalar is not called in this module, but it is called when computing
-    delta-e.
-    """
-    return a.item()
-
-
-np.asscalar = patch_asscalar  # type: ignore
-
-
-def _get_squared_error(vector_a: VectorLike, vector_b: VectorLike) -> float:
+def _get_squared_error(vector_a: _RGB, vector_b: _RGB) -> float:
     """Get squared distance between two vectors.
 
     :param vector_a: vector
     :param vector_b: vector
     :return: squared Euclidian distance from vector_a to vector_b
     """
-    squared_error: np.floating[Any] = np.sum(np.subtract(vector_a, vector_b) ** 2)
-    return float(squared_error)
+    return get_sqeuclidean(vector_a, vector_b)
 
 
 class Member:
@@ -99,9 +77,6 @@ class Member:
 
         :param stacked_vectors: a list of vectors with weight channels in the last axis
         :return: set of Member instances
-
-        Silently drop colors without weight. It is possible to return an empty set if
-        no colors have weight > 0.
         """
         return {Member(v) for v in stacked_vectors if v[-1]}
 
@@ -177,7 +152,7 @@ class Cluster:
         :return: Member instance with median rgb and sum weight of cluster members
         """
         vss, ws = self.vss, self.ws
-        rgbw = np.array([*get_stacked_medians(vss, ws), np.sum(ws)])
+        rgbw = np.array([*get_stacked_medians(vss, ws), sum(w for w, in ws)])
         return Member(rgbw)
 
     @property
