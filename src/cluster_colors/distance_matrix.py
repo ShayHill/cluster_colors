@@ -3,6 +3,7 @@
 :author: Shay Hill
 :created: 2022-10-27
 """
+
 import math
 from collections.abc import Callable, Hashable
 from contextlib import suppress

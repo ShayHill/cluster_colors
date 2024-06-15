@@ -12,3 +12,5 @@ BINARIES_DIR = _PROJECT_ROOT / "binaries"
 TEST_DIR = _PROJECT_ROOT / "tests"
 
 TEST_DIR.mkdir(parents=True, exist_ok=True)
+
+BINARIES_DIR.mkdir(parents=True, exist_ok=True)

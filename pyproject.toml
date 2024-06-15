@@ -20,7 +20,6 @@ build-backend = "setuptools.build_meta"
 name = "cz_conventional_commits"
 version = "1.0.0"
 tag_format = "$version"
-major-version-zero = true
 version_files = ["pyproject.toml:^version"]
 
 

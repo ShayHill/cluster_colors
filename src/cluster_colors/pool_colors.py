@@ -26,6 +26,8 @@ from cluster_colors.type_hints import FPArray, NBits
 _8BitCube = Annotated[FPArray, (256, 256, 256, ...)]
 _FReduce = Callable[[FPArray, tuple[int, ...]], FPArray]
 
+_EightBits = 8
+
 
 def _pool(matrix: FPArray, kernel_shape: tuple[int, ...], func: _FReduce) -> FPArray:
     """Pool a multi-dimensional array of numbers or arrays of numbers.
@@ -50,7 +52,7 @@ def _pool(matrix: FPArray, kernel_shape: tuple[int, ...], func: _FReduce) -> FPA
     use sum, the [0,0] value of a 4x4 matrix pooled to a 2x2 matrix will be the sum
     of the 16 values in the 4x4 matrix.
     """
-    if not all(v % k == 0 for v, k in zip(matrix.shape, kernel_shape)):
+    if not all(v % k == 0 for v, k in zip(matrix.shape, kernel_shape, strict=False)):
         msg = par(
             f"""matrix shape {matrix.shape} is not a multiple of kernel shape
             {kernel_shape}"""
@@ -58,7 +60,7 @@ def _pool(matrix: FPArray, kernel_shape: tuple[int, ...], func: _FReduce) -> FPA
         raise ValueError(msg)
     matrix_shape = matrix.shape[: len(kernel_shape)]
     vector_shape = matrix.shape[len(kernel_shape) :]
-    folded_dims = [(v // k, k) for v, k in zip(matrix_shape, kernel_shape)]
+    folded_dims = [(v // k, k) for v, k in zip(matrix_shape, kernel_shape, strict=True)]
     pools_shape = tuple(chain(*folded_dims))
     reshaped = matrix.reshape(pools_shape + vector_shape)
     return func(reshaped, tuple(range(len(matrix_shape))))
@@ -117,7 +119,7 @@ def pool_colors(colors: FPArray, nbits: NBits = 6) -> FPArray:
     """
     num_axes = colors.shape[-1]
     max_colors = (2**nbits) ** (num_axes - 1)
-    if nbits == 8 or len(colors) <= max_colors:
+    if nbits >= _EightBits or len(colors) <= max_colors:
         return colors
 
     colorspace = _fill_colorspace(colors)

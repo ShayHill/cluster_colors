@@ -114,6 +114,15 @@ repos:
   # D203 1 blank line required before class docstring (incompatible with D211)
   # D213 multi line summary second line (incompatible with D212):
   # ISC003 Explicitly concatenated string should be implicitly concatenated
+  #
+  # ANN101 Missing type annotation for self in method
+  # ANN102 Missing type annotation for cls in classmethod
+  # ANN201 Asks for -> None return type annotation for public methods
+  # ANN202 Asks for -> None return type annotation for private methods
+  # D400 First line should end with a period
+  # D401 First line should be in imperative mood
+  # PYI019 Method should used typing.Self instead of TypeVar (incompatible with Python 3.10)
+  #
   rev: 'v0.4.9'
   hooks:
     - id: ruff
@@ -121,7 +130,7 @@ repos:
       args:
       - --target-version=py310
       - --select=ALL
-      - --ignore=COM812,D203,D213,ISC003
+      - --ignore=COM812,D203,D213,ISC003,ANN101,ANN102,ANN201,ANN202,D400,D401,PYI019
       # - --fix
 
 # reads pyproject.toml for additional config

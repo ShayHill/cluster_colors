@@ -7,3 +7,4 @@ binaries/
 tags
 dev-requirements.txt
 requirements.txt
+!**/sugar-shack-barnes.jpg

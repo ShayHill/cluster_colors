@@ -10,13 +10,12 @@ import functools
 from typing import TYPE_CHECKING, Annotated, NamedTuple, TypeVar
 
 import numpy as np
-from basic_colormath import get_delta_e_lab, rgb_to_lab, get_sqeuclidean
+from basic_colormath import get_delta_e_lab, rgb_to_lab
 from paragraphs import par
 from stacked_quantile import get_stacked_median, get_stacked_medians
 
 from cluster_colors.distance_matrix import DistanceMatrix
 
-_T = TypeVar("_T", bound=object)
 _RGB = tuple[float, float, float]
 
 if TYPE_CHECKING:
@@ -25,14 +24,16 @@ if TYPE_CHECKING:
     from cluster_colors.type_hints import FPArray, StackedVectors, Vector, VectorLike
 
 
-def _get_squared_error(vector_a: _RGB, vector_b: _RGB) -> float:
+def _get_squared_error(
+    vector_a: tuple[float, ...], vector_b: tuple[float, ...]
+) -> float:
     """Get squared distance between two vectors.
 
     :param vector_a: vector
     :param vector_b: vector
     :return: squared Euclidian distance from vector_a to vector_b
     """
-    return get_sqeuclidean(vector_a, vector_b)
+    return sum((a - b) ** 2 for a, b in zip(vector_a, vector_b, strict=True))
 
 
 class Member:
@@ -79,9 +80,6 @@ class Member:
         :return: set of Member instances
         """
         return {Member(v) for v in stacked_vectors if v[-1]}
-
-
-_ClusterT = TypeVar("_ClusterT", bound="Cluster")
 
 
 class Cluster:
@@ -189,7 +187,8 @@ class Cluster:
 
         :return: Lab color tuple
         """
-        return rgb_to_lab(self.exemplar)
+        r, g, b = self.exemplar
+        return rgb_to_lab((r, g, b))
 
     @functools.cached_property
     def _np_linalg_eig(self) -> tuple[FPArray, FPArray]:
@@ -404,10 +403,12 @@ class StatesCache:
             state.
         """
         for i, (clusters, min_span) in enumerate(
-            zip(self.cluster_sets, self.min_spans)
+            zip(self.cluster_sets, self.min_spans, strict=True)
         ):
             if clusters is not None:
-                assert min_span is not None
+                if min_span is None:
+                    msg = "min_span is None for non-None clusters"
+                    raise ValueError(msg)
                 yield _State(i, clusters, min_span)
 
     def rev_enumerate(self) -> Iterator[_State]:
@@ -795,7 +796,7 @@ class Supercluster:
 
         :return: True if any changes were made
         """
-        if len(self) < 2:
+        if len(self) in {0, 1}:
             return False
         if all(x.exemplar_age > 0 for x in self.clusters):
             return False
