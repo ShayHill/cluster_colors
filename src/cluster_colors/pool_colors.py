@@ -19,6 +19,7 @@ from itertools import chain
 from typing import Annotated
 
 import numpy as np
+from basic_colormath import float_to_8bit_int
 from paragraphs import par
 
 from cluster_colors.type_hints import FPArray, NBits
@@ -27,6 +28,15 @@ _8BitCube = Annotated[FPArray, (256, 256, 256, ...)]
 _FReduce = Callable[[FPArray, tuple[int, ...]], FPArray]
 
 _EightBits = 8
+
+
+def _floats_to_8bit_ints(*floats: float) -> tuple[int, ...]:
+    """Convert floats from [0, 255] to 8-bit integers.
+
+    :param floats: floats in the range [0.0, 255.0]
+    :return: a tuple of 8-bit integers in the range [0, 255]
+    """
+    return tuple(float_to_8bit_int(f) for f in floats)
 
 
 def _pool(matrix: FPArray, kernel_shape: tuple[int, ...], func: _FReduce) -> FPArray:
@@ -63,7 +73,7 @@ def _pool(matrix: FPArray, kernel_shape: tuple[int, ...], func: _FReduce) -> FPA
     folded_dims = [(v // k, k) for v, k in zip(matrix_shape, kernel_shape, strict=True)]
     pools_shape = tuple(chain(*folded_dims))
     reshaped = matrix.reshape(pools_shape + vector_shape)
-    return func(reshaped, tuple(range(len(matrix_shape))))
+    return func(reshaped, tuple(x * 2 + 1 for x in range(len(matrix_shape))))
 
 
 def _pool_8bit_cube(colors: FPArray, nbits: NBits) -> FPArray:
@@ -93,10 +103,10 @@ def _fill_colorspace(colors: FPArray) -> FPArray:
     num_axes = colors.shape[-1]
     colorspace_shape = (256,) * (num_axes - 1) + (num_axes,)
     colorspace = np.zeros(colorspace_shape, dtype="float")
-    ixs = colors[..., :-1].astype(int)
-    wss = colors[..., -1:]
-    vss = ixs.astype(float) * wss
-    colorspace[tuple(ixs.T)] = np.concatenate((vss, wss), axis=-1)
+    for color in colors:
+        vss = color[:-1] * color[-1]
+        ixs = _floats_to_8bit_ints(*color[:-1])
+        colorspace[ixs] += np.concatenate((vss, color[-1:]), axis=-1)
     return colorspace
 
 
@@ -120,7 +130,7 @@ def pool_colors(colors: FPArray, nbits: NBits = 6) -> FPArray:
     num_axes = colors.shape[-1]
     max_colors = (2**nbits) ** (num_axes - 1)
     if nbits >= _EightBits or len(colors) <= max_colors:
-        return colors
+        nbits = 8
 
     colorspace = _fill_colorspace(colors)
     colorspace = _pool_8bit_cube(colorspace, nbits)

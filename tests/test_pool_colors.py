@@ -30,7 +30,7 @@ class TestPoolColors:
         img = Image.open(TEST_DIR / "sugar-shack-barnes.jpg")
         colors = np.array(img)
         weights = np.full(colors.shape[:-1], 1, dtype=float)
-        weighted_colors = np.dstack((colors, weights))
+        weighted_colors = stack_vectors(np.dstack((colors, weights)))
         reduced = pool_colors.pool_colors(weighted_colors, 4)
         assert np.sum(reduced[..., 3]) == colors.shape[0] * colors.shape[1]
 
@@ -44,10 +44,42 @@ class TestPoolColors:
         assert reduced == reduced2
 
     def test_singles(self):
-        """Single color should be returned."""
+        """When color has a weight of 1 and does not stack, return same."""
         img = Image.open(TEST_DIR / "sugar-shack-barnes.jpg")
         colors = np.array(img).reshape(-1, 1)
         stacked_colors = stack_vectors(colors)
         reduced = {tuple(x) for x in pool_colors.pool_colors(stacked_colors, 4)}
         reduced2 = {tuple(x) for x in pool_colors.pool_colors(stacked_colors[::-1], 4)}
         assert reduced == reduced2
+
+    def test_small_number_of_identical_colors(self):
+        """Do not return identical colors.
+
+        Previousy, `pool_colors` would not try to pool when there were fewer input
+        colors than the number of boxes in an nbits cube. This is to avoid needlessly
+        discarding colors when few colors are present. This behavior caused problems:
+
+        * identical colors were stacked by `stack_vectors`
+        * *nearly* identical colors were not stacked or pooled.
+
+        This caused problems later on, because the nearly identical colors *were*
+        identical at 8-bits. Eventually, these colors created identical clusters,
+        which broke the clustering algorithm.
+        """
+        colors = np.array(
+            [
+                [254.8, 0, 0, 1],
+                [0, 254.9, 0, 1],
+                [0, 254.8, 0, 1],
+                [0, 254.7, 0, 1],
+                [0, 0, 255, 1],
+                [0, 0, 254.9, 1],
+                [0, 0, 254.8, 1],
+                [0, 0, 254.7, 1],
+                [0, 0, 254.6, 1],
+            ]
+        )
+        stacked_colors = stack_vectors(colors)
+        reduced = sorted(map(tuple, pool_colors.pool_colors(stacked_colors, 4)))
+        expect = [[0, 0, 254.8, 5], [0, 254.8, 0, 3], [254.8, 0, 0, 1]]
+        np.testing.assert_array_almost_equal(reduced, expect)
