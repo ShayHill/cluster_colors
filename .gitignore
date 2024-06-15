@@ -1,7 +1,9 @@
+Update-PythonVenv.ps1
 *jpg
 *svg
 *png
 *pkl
 binaries/
 tags
-.vscode
+dev-requirements.txt
+requirements.txt

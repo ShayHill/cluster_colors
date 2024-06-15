@@ -1,46 +1,52 @@
-[tool.poetry]
-name = "cluster-colors"
+[project]
+name = "cluster_colors"
 version = "0.11.1"
-description = "Cluster color vectors with kmedians"
-authors = ["Shay Hill <shay_public@hotmail.com>"]
-license = "MIT"
+description = "Cluster rgb vectors with divisive kmedians"
+authors = [{ name = "Shay Hill", email = "shay_public@hotmail.com" }]
+license = {text = "MIT"}
 readme = "README.md"
-packages = [{include = "cluster_colors", from = "src"}]
+requires-python = ">=3.10"
+dependencies = ["numpy", "stacked-quantile", "paragraphs", "basic-colormath"]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-numpy = "^1.24.1"
-stacked-quantile = "^0.3.0"
-paragraphs = "^0.2.0"
-basic-colormath = "^0.1.0"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.2.1"
-conventionalish = "^0.1.1"
-pillow = "^9.4.0"
-matplotlib = "^3.6.3"
-pre-commit = "^2.21.0"
-black = "^23.1.0"
-tox = "^4.4.7"
-
-[tool.commitizen]
-name = "cz_conventionalish"
-version = "0.11.1"
-tag_format = "$version"
-major_version_zero = "true"
-version_files = [
-    "pyproject.toml:^version"
-]
+[project.optional-dependencies]
+dev = ["commitizen", "pre-commit", "pytest", "tox", "pillow", "matplotlib"]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.11.1"
+tag_format = "$version"
+major-version-zero = true
+version_files = ["pyproject.toml:^version"]
+
+
+[tool.isort]
+profile = "black"
+
+
+[tool.pytest.ini_options]
+addopts = "--doctest-modules"
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+envlist = py{310,311,312}
+
+[testenv]
+deps = pytest
+commands = pytest
+"""
+
 
 [tool.pyright]
 include = ["src"]
 exclude = ["**/__pycache__.py"]
 
-pythonVersion = "^3.10"
+pythonVersion = "3.10"
 pythonPlatform = "Any"
 
 typeCheckingMode = "strict"
@@ -53,5 +59,5 @@ reportUninitializedInstanceVariable = true
 reportUnnecessaryTypeIgnoreComment = true
 reportUnusedCallResult = true
 
-venvPath = "C:\\Users\\shaya\\AppData\\Local\\pypoetry\\Cache\\virtualenvs"
-venv = "C:\\Users\\shaya\\AppData\\Local\\pypoetry\\Cache\\virtualenvs\\cluster-colors-cj794jDH-py3.11"
+venvPath = "."
+venv = "./venv"
