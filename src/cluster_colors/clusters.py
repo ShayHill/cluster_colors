@@ -197,7 +197,8 @@ class Cluster:
         :return: tuple of eigenvalues and eigenvectors
         """
         vss, ws = self.vss, self.ws
-        covariance_matrix: FPArray = np.cov(vss.T, fweights=ws.flatten())
+        frequencies = np.clip(ws.flatten(), 1, None).astype(int)
+        covariance_matrix: FPArray = np.cov(vss.T, fweights=frequencies)
         eigenvalues, eigenvectors = np.linalg.eig(covariance_matrix)
         return np.real(eigenvalues), np.real(eigenvectors)
 
