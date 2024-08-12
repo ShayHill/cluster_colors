@@ -23,7 +23,9 @@ from cluster_colors.pool_colors import pool_colors
 from cluster_colors.vector_stacker import stack_vectors
 
 if TYPE_CHECKING:
-    from cluster_colors.type_hints import FPArray, NBits, StackedVectors
+    from numpy import typing as npt
+
+    from cluster_colors.type_hints import NBits, StackedVectors
 
 
 def _stack_image_colors_no_cache(
@@ -122,7 +124,7 @@ def show_clusters(supercluster: KMedSupercluster, filename_stem: str) -> None:
     """
     width = 1000
     sum_weight = sum(c.w for c in supercluster)
-    stripes: list[FPArray] = []
+    stripes: list[npt.NDArray[np.uint8]] = []
     for cluster in supercluster:
         stripe_width = max(round(cluster.w / sum_weight * width), 1)
         stripes.append(
