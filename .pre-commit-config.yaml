@@ -44,7 +44,7 @@ repos:
         # files: .pre-commit-config.yaml
 
 - repo: https://github.com/pre-commit/mirrors-mypy
-  rev: v1.11.1
+  rev: v1.11.2
   hooks:
   - id: mypy
     name: mypy
@@ -123,7 +123,7 @@ repos:
   # D401 First line should be in imperative mood
   # PYI019 Method should used typing.Self instead of TypeVar (incompatible with Python 3.10)
   #
-  rev: 'v0.5.7'
+  rev: 'v0.6.3'
   hooks:
     - id: ruff
       exclude: "tests"
@@ -135,6 +135,6 @@ repos:
 
 # reads pyproject.toml for additional config
 - repo: https://github.com/RobertCraigie/pyright-python
-  rev: v1.1.375
+  rev: v1.1.378
   hooks:
     - id: pyright
