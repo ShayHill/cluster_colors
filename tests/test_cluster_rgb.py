@@ -44,6 +44,7 @@ class TestClusterExemplar:
             {Member(np.array([1, 2, 3, 2])), Member(np.array([4, 5, 6, 1]))}
         )
         assert cluster.exemplar == (1, 2, 3)
+        np.testing.assert_array_equal(cluster.exemplar, (1, 2, 3))
 
 
 class TestCluster:

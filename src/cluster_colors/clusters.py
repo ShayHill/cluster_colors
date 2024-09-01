@@ -10,10 +10,11 @@ import functools
 from typing import TYPE_CHECKING, Annotated, NamedTuple, TypeVar
 
 import numpy as np
-from basic_colormath import get_delta_e_lab, rgb_to_lab
+from basic_colormath import get_delta_e_lab, get_sqeuclidean, rgb_to_lab
 from paragraphs import par
 from stacked_quantile import get_stacked_median, get_stacked_medians
 
+from cluster_colors.cluster_member import Member
 from cluster_colors.distance_matrix import DistanceMatrix
 
 _RGB = tuple[float, float, float]
@@ -21,7 +22,7 @@ _RGB = tuple[float, float, float]
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
-    from cluster_colors.type_hints import FPArray, StackedVectors, Vector, VectorLike
+    from cluster_colors.type_hints import FPArray, VectorLike
 
 
 def _get_squared_error(
@@ -33,53 +34,9 @@ def _get_squared_error(
     :param vector_b: vector
     :return: squared Euclidian distance from vector_a to vector_b
     """
-    return sum((a - b) ** 2 for a, b in zip(vector_a, vector_b, strict=True))
-
-
-class Member:
-    """A member of a cluster.
-
-    When clustering initial images arrays, the weight will only represent the number
-    of times the color appears in the image. After removing some color or adding an
-    alpha channel, the weight will also reflect the alpha channel, with transparent
-    colors weighing less.
-    """
-
-    def __init__(self, weighted_vector: Vector) -> None:
-        """Create a new Member instance.
-
-        :param weighted_vector: a vector with a weight in the last axis
-            (r, g, b, w)
-        :param ancestors: sets of ancestors to merge
-        """
-        self.as_array = weighted_vector
-
-    @property
-    def vs(self) -> tuple[float, ...]:
-        """All value axes of the Member as a tuple.
-
-        :return: tuple of values that are not the weight
-            the (r, g, b) in (r, g, b, w)
-        """
-        return tuple(self.as_array[:-1])
-
-    @property
-    def w(self) -> float:
-        """Weight of the Member.
-
-        :return: weight of the Member
-            the w in (r, g, b, w)
-        """
-        return self.as_array[-1]
-
-    @classmethod
-    def new_members(cls, stacked_vectors: StackedVectors) -> set[Member]:
-        """Transform an array of rgb or rgbw colors into a set of _Member instances.
-
-        :param stacked_vectors: a list of vectors with weight channels in the last axis
-        :return: set of Member instances
-        """
-        return {Member(v) for v in stacked_vectors if v[-1]}
+    ra, ga, ba = vector_a
+    rb, gb, bb = vector_b
+    return get_sqeuclidean((ra, ga, ba), (rb, gb, bb))
 
 
 class Cluster:
@@ -202,7 +159,7 @@ class Cluster:
         eigenvalues, eigenvectors = np.linalg.eig(covariance_matrix)
         return np.real(eigenvalues), np.real(eigenvectors)
 
-    @functools.cached_property
+    @property
     def _variance(self) -> float:
         """Get the variance of the cluster.
 
@@ -210,7 +167,7 @@ class Cluster:
         """
         return max(self._np_linalg_eig[0])
 
-    @functools.cached_property
+    @property
     def _direction_of_highest_variance(self) -> FPArray:
         """Get the first Eigenvector of the covariance matrix.
 
@@ -284,7 +241,7 @@ class Cluster:
             :param rgb: color to get distance from plane
             :return: relative distance of rgb from plane
             """
-            return float(np.dot(abc, rgb))
+            return np.dot(abc, rgb)
 
         scored = [(get_rel_dist(member.vs), member) for member in self.members]
         median_score = get_stacked_median(
