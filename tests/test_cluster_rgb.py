@@ -8,12 +8,14 @@ from typing import Iterable
 
 import numpy as np
 import pytest
-from matplotlib import pyplot as plt  # type: ignore
+from matplotlib import pyplot as plt
 
 # pyright: reportPrivateUsage=false
 import cluster_colors.clusters
-from cluster_colors.clusters import Cluster, Member
+from cluster_colors.cluster_member import Member
+from cluster_colors.clusters import Cluster
 from cluster_colors.vector_stacker import  stack_vectors
+from basic_colormath import rgb_to_lab
 
 
 
@@ -34,6 +36,29 @@ class TestMemberNewMembers:
         members = Member.new_members(colors)
         assert len(members) == len(colors)
 
+    def test_member_vs(self) -> None:
+        """Return the (r, g, b) values of the member."""
+        member = Member(np.array([1, 2, 3, 4]))
+        assert (member.vs == (1, 2, 3)).all()
+
+    def test_member_w(self) -> None:
+        """Return the weight of the member."""
+        member = Member(np.array([1, 2, 3, 4]))
+        assert member.w == 4
+
+    def test_member_rgb_floats(self) -> None:
+        member = Member(np.array([1, 2, 3.3, 4]))
+        assert member.rgb_floats == (1, 2, 3.3)
+
+    def test_member_rgb(self) -> None:
+        member = Member(np.array([1, 2, 3.3, 4]))
+        assert member.rgb == (1, 2, 3)
+
+    def test_member_lab(self) -> None:
+        member = Member(np.array([1, 2, 3.3, 4]))
+        assert member.lab == rgb_to_lab((1, 2, 3))
+
+
 
 class TestClusterExemplar:
     """Test triangulate_image._Cluster.exemplar property"""
@@ -43,7 +68,6 @@ class TestClusterExemplar:
         cluster = cluster_colors.clusters.Cluster(
             {Member(np.array([1, 2, 3, 2])), Member(np.array([4, 5, 6, 1]))}
         )
-        assert cluster.exemplar == (1, 2, 3)
         np.testing.assert_array_equal(cluster.exemplar, (1, 2, 3))
 
 
