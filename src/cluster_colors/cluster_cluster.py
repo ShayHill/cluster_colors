@@ -3,27 +3,30 @@
 :author: Shay Hill
 :created: 2024-09-03
 """
+
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Annotated, NamedTuple, TypeVar, Literal
+from typing import TYPE_CHECKING, Annotated, Literal, NamedTuple, TypeVar
 
 import numpy as np
 from basic_colormath import get_delta_e_lab, get_sqeuclidean, rgb_to_lab
 from paragraphs import par
 from stacked_quantile import get_stacked_median, get_stacked_medians
 
-from cluster_colors.cluster_member import Member, split_members_by_plane
+from cluster_colors.cluster_member import Member, Members, split_members_by_plane
 from cluster_colors.distance_matrix import DistanceMatrix
-from cluster_colors.cluster_member import Members
+import itertools
 
 _RGB = tuple[float, float, float]
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
-    from cluster_colors.type_hints import FPArray, VectorLike, Vector
+    from cluster_colors.type_hints import FPArray, StackedVectors, Vector, VectorLike
 
+
+_sn_gen = itertools.count()
 
 def _cmp(a: float, b: float) -> Literal[-1, 0, 1]:
     """Compare two floats.
@@ -92,18 +95,28 @@ class Cluster:
     #     self._vss, self._ws = np.split(as_array, [-1], axis=1)
     #     self._children: Annotated[set[Cluster], "doubleton"] | None = None
 
-    def __init__(self, members: Members, ixs: Iterable[int]) -> None:
+    def __init__(self, members: Members, ixs: Iterable[int] | None = None) -> None:
         """Identify a cluster by the indices of its members.
 
         :param members: Members instance
-        :param ixs: indices of members
+        :param ixs: optional indices of members. If None, use all members.
         """
         self.members = members
-        self.ixs = np.array(list(ixs), dtype=np.int32)
+        if ixs is None:
+            self.ixs = np.arange(len(self.members), dtype=np.int32)
+        else:
+            self.ixs = np.array(list(ixs), dtype=np.int32)
+        self._sn = next(_sn_gen)
 
+    def __len__(self) -> int:
+        """Get the number of members in the cluster.
+
+        :return: number of members in the cluster
+        """
+        return len(self.ixs)
 
     @classmethod
-    def from_stacked_vectors(cls, stacked_vectors: FPArray) -> Cluster:
+    def from_stacked_vectors(cls, stacked_vectors: StackedVectors) -> Cluster:
         """Create a Cluster instance from an iterable of colors.
 
         :param stacked_vectors: An iterable of vectors with a weight axis
@@ -111,7 +124,8 @@ class Cluster:
         :return: A Cluster instance with members
             {Member([r0, g0, b0, w0]), Member([r1, g1, b1, w1]), ...}
         """
-        return cls(Member.new_members(stacked_vectors))
+        members = Members.from_stacked_vectors(stacked_vectors)
+        return cls(members)
 
     def __iter__(self) -> Iterator[Member]:
         """Iterate over members.
@@ -174,6 +188,23 @@ class Cluster:
         """
         return self._get_medoid_respecting_weights()
 
+    @property
+    def as_vector(self) -> Vector:
+        """Get the exemplar as a vector.
+
+        :return: exemplar as a vector
+        """
+        return self.members.vectors[self.exemplar]
+
+    @property
+    def as_stacked_vector(self) -> Vector:
+        """Get the exemplar as a stacked vector.
+
+        :return: exemplar as a stacked vector
+        """
+        weight = self.members.weights[self.exemplar]
+        return np.append(self.as_vector, weight)
+
     @functools.cached_property
     def medoid(self) -> int:
         """Get the index of the mediod, mostly ignoring weights.
@@ -195,7 +226,6 @@ class Cluster:
             return int(self.ixs[arg_where_min[0]])
         else:
             return self._get_medoid_respecting_weights(arg_where_min)
-
 
     @property
     def rgb_floats(self) -> tuple[float, float, float]:
@@ -238,9 +268,9 @@ class Cluster:
 
         :return: covariance matrix of the cluster
         """
-        vss = self.members.vectors[self.ixs, :-1]
-        ws = np.ceil(self.members.vectors[self.ixs, -1])
-        return np.cov(vss.T, fweights=ws)
+        vs = self.members.vectors
+        ws = np.ceil(self.members.weights)
+        return np.cov(vs.T, fweights=ws)
 
     @functools.cached_property
     def _np_linalg_eig(self) -> tuple[FPArray, FPArray]:
@@ -248,8 +278,11 @@ class Cluster:
 
         :return: tuple of eigenvalues and eigenvectors
         """
-        eigenvalues, eigenvectors = np.linalg.eig(self.covariance_matrix)
-        return np.real(eigenvalues), np.real(eigenvectors)
+        try:
+            eigenvalues, eigenvectors = np.linalg.eig(self.covariance_matrix)
+            return np.real(eigenvalues), np.real(eigenvectors)
+        except:
+            breakpoint()
 
     @property
     def _variance(self) -> float:
@@ -271,6 +304,27 @@ class Cluster:
         return eigenvectors[:, np.argmax(eigenvalues)]
 
     @functools.cached_property
+    def error(self) -> float:
+        """Get the sum of proximity errors of all members.
+
+        :return: sum of squared errors of all members
+        """
+        if len(self) == 1:
+            return 0
+        return float(np.sum(self.members.weighted_pmatrix[self.exemplar]))
+
+    @property
+    def error_metric(self) -> tuple[float, int]:
+        """Break ties in the error property.
+
+        :return: the error and negative _sn so older cluster will split in case of a
+            tie.
+
+        Ties aren't likely, but just to keep everything deterministic.
+        """
+        return self.error, -self._sn
+
+    @functools.cached_property
     def quick_error(self) -> float:
         """Product of variance and weight as a rough cost metric.
 
@@ -284,6 +338,7 @@ class Cluster:
             return 0.0
         return self._variance * self.w
 
+    # TODO: create a test with some 0-weight members
     @functools.cached_property
     def is_splittable(self) -> bool:
         """Can the cluster be split?
@@ -321,12 +376,12 @@ class Cluster:
         abc = self._direction_of_highest_variance
 
         def rel_dist(x: int) -> float:
-            return np.dot(abc, self.members.vectors[x, :-1])
+            return np.dot(abc, self.members.vectors[x])
 
         sorted_along_dhv = sorted(self.ixs, key=rel_dist)
         return {
-                Cluster(self.members, sorted_along_dhv[:len(self.ixs)//2]),
-                Cluster(self.members, sorted_along_dhv[len(self.ixs)//2:]),
+            Cluster(self.members, sorted_along_dhv[: len(self.ixs) // 2]),
+            Cluster(self.members, sorted_along_dhv[len(self.ixs) // 2 :]),
         }
 
     def se(self, member_candidate: Member) -> float:

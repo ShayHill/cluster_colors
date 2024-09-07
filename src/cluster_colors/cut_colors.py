@@ -15,11 +15,12 @@ starting point for kmedians.
 
 import numpy as np
 
+from cluster_colors.cluster_member import Members
 from cluster_colors.clusters import Cluster, Member
 from cluster_colors.type_hints import StackedVectors
 
 
-def _split_every_cluster(clusters: set[Cluster], max_num: int) -> set[Cluster]:
+def _split_every_cluster(clusters: set[Cluster]) -> set[Cluster]:
     """Recursively split every cluster.
 
     :param clusters: A set of clusters.
@@ -28,13 +29,13 @@ def _split_every_cluster(clusters: set[Cluster], max_num: int) -> set[Cluster]:
     Recursively split every cluster with no regard for error. Will only *not* split
     a cluster if it only has one member.
     """
-    splittable = {c for c in clusters if len(c.members) > 1}
-    if not splittable or len(splittable) + len(clusters) > max_num:
+    splittable = {c for c in clusters if len(c) > 1}
+    if not splittable:
         return clusters
     for cluster in splittable:
         clusters.remove(cluster)
         clusters.update(cluster.split())
-    return _split_every_cluster(clusters, max_num)
+    return clusters
 
 
 def _split_largest_cluster(clusters: set[Cluster], num: int) -> set[Cluster]:
@@ -45,13 +46,13 @@ def _split_largest_cluster(clusters: set[Cluster], num: int) -> set[Cluster]:
     """
     if len(clusters) >= num:
         return clusters
-    max_error = max(c.quick_error for c in clusters)
-    if max_error == 0:
+
+    next_split = max(clusters, key=lambda c: c.error_metric)
+    if next_split.error == 0:
         return clusters
-    for cluster in [c for c in clusters if c.quick_error == max_error]:
-        clusters.remove(cluster)
-        clusters.update(cluster.split())
-    return _split_every_cluster(clusters, num)
+    clusters.remove(next_split)
+    clusters.update(next_split.split())
+    return clusters
 
 
 def cut_colors(colors: StackedVectors, num: int) -> StackedVectors:
@@ -70,10 +71,15 @@ def cut_colors(colors: StackedVectors, num: int) -> StackedVectors:
     """
     if len(colors) <= num:
         return colors
-    clusters = {Cluster(Member.new_members(colors))}
-    clusters = _split_every_cluster(clusters, num // 2)
+
+    clusters = {Cluster.from_stacked_vectors(colors)}
+    while len(clusters) < num // 4:
+        clusters = _split_every_cluster(clusters)
+
     while len(clusters) < num:
-        if not any(len(c.members) > 1 for c in clusters):
-            break
+        len_clusters = len(clusters)
         clusters = _split_largest_cluster(clusters, num)
-    return np.array([c.as_member.as_array for c in clusters])
+        if len(clusters) == len_clusters:
+            break
+
+    return np.array([c.as_stacked_vector for c in clusters])

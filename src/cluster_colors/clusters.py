@@ -7,27 +7,23 @@
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Annotated, NamedTuple, TypeVar, Literal
+from typing import TYPE_CHECKING, Annotated, Literal, NamedTuple, TypeVar
 
 import numpy as np
 from basic_colormath import get_delta_e_lab, get_sqeuclidean, rgb_to_lab
 from paragraphs import par
 from stacked_quantile import get_stacked_median, get_stacked_medians
 
+from cluster_colors.cluster_cluster import Cluster
 from cluster_colors.cluster_member import Member
 from cluster_colors.distance_matrix import DistanceMatrix
-from cluster_colors.cluster_cluster import Cluster
 
 _RGB = tuple[float, float, float]
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
-    from cluster_colors.type_hints import FPArray, VectorLike, Vector
-
-
-
-
+    from cluster_colors.type_hints import FPArray, Vector, VectorLike
 
 
 def _get_cluster_delta_e_cie2000(cluster_a: Cluster, cluster_b: Cluster) -> float:

@@ -10,18 +10,30 @@ not 3 values long.
 
 from __future__ import annotations
 
+import functools
 import functools as ft
-from typing import TYPE_CHECKING, Literal, Callable, Iterable
+from typing import TYPE_CHECKING, Literal
+
+from collections.abc import Callable, Iterable
+
 import numpy as np
+from basic_colormath import (
+    float_tuple_to_8bit_int_tuple,
+    get_delta_e_matrix,
+    get_sqeuclidean_matrix,
+    rgb_to_lab,
+)
 from numpy import typing as npt
 from stacked_quantile import get_stacked_median, get_stacked_medians
-from basic_colormath import get_delta_e_matrix, get_sqeuclidean_matrix
-
-from basic_colormath import float_tuple_to_8bit_int_tuple, rgb_to_lab
-import functools
 
 if TYPE_CHECKING:
-    from cluster_colors.type_hints import FPArray, StackedVectors, Vector, VectorLike, ProximityMatrix
+    from cluster_colors.type_hints import (
+        FPArray,
+        ProximityMatrix,
+        StackedVectors,
+        Vector,
+        VectorLike,
+    )
 
 
 class Members:
@@ -48,13 +60,20 @@ class Members:
         self.vectors = np.array(list(map(list, vectors))).astype(float)
 
         if weights is None:
-            self.weights = np.ones(len(self.vectors))
+            self.weights = np.ones(len(self))
         else:
             self.weights = np.array(list(weights))
         if pmatrix is None:
             self.pmatrix = get_sqeuclidean_matrix(self.vectors)
         else:
             self.pmatrix = pmatrix
+
+    def __len__(self) -> int:
+        """Number of members in the Members instance.
+
+        :return: number of members
+        """
+        return len(self.vectors)
 
     @functools.cached_property
     def weighted_pmatrix(self) -> ProximityMatrix:
