@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Annotated, NamedTuple, TypeVar
+from typing import TYPE_CHECKING, Annotated, NamedTuple, TypeVar, Literal
 
 import numpy as np
 from basic_colormath import get_delta_e_lab, get_sqeuclidean, rgb_to_lab
@@ -16,277 +16,18 @@ from stacked_quantile import get_stacked_median, get_stacked_medians
 
 from cluster_colors.cluster_member import Member
 from cluster_colors.distance_matrix import DistanceMatrix
+from cluster_colors.cluster_cluster import Cluster
 
 _RGB = tuple[float, float, float]
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
-    from cluster_colors.type_hints import FPArray, VectorLike
+    from cluster_colors.type_hints import FPArray, VectorLike, Vector
 
 
-def _get_squared_error(
-    vector_a: tuple[float, ...], vector_b: tuple[float, ...]
-) -> float:
-    """Get squared distance between two vectors.
-
-    :param vector_a: vector
-    :param vector_b: vector
-    :return: squared Euclidian distance from vector_a to vector_b
-    """
-    ra, ga, ba = vector_a
-    rb, gb, bb = vector_b
-    return get_sqeuclidean((ra, ga, ba), (rb, gb, bb))
 
 
-class Cluster:
-    """A cluster of Member instances.
-
-    :param members: Member instances
-
-    Hold Members in a set. It is important for convergence that the exemplar is not
-    updated each time a member is added or removed. Add members from other clusters to
-    queue_add and self members to queue_sub. Do not update the members or
-    process_queue until each clusters' members have be offered to all other clusters.
-
-    When all clusters that should be moved have been inserted into queues, call
-    process_queue and, if changes have occurred, create a new Cluster instance for
-    the next round.
-
-    This is almost a frozen class, but the queue_add, queue_sub, and exemplar_age
-    attributes are intended to be mutable.
-    """
-
-    def __init__(self, members: Iterable[Member]) -> None:
-        """Initialize a Cluster instance.
-
-        :param members: Member instances
-        :raise ValueError: if members is empty
-        """
-        if not members:
-            msg = "Cannot create an empty cluster"
-            raise ValueError(msg)
-        self.members = set(members)
-        self.exemplar_age = 0
-        self.queue_add: set[Member] = set()
-        self.queue_sub: set[Member] = set()
-        self.vss, self.ws = np.split(self.as_array, [-1], axis=1)
-        self._children: Annotated[set[Cluster], "doubleton"] | None = None
-
-    @classmethod
-    def from_stacked_vectors(cls, stacked_vectors: FPArray) -> Cluster:
-        """Create a Cluster instance from an iterable of colors.
-
-        :param stacked_vectors: An iterable of vectors with a weight axis
-            [(r0, g0, b0, w0), (r1, g1, b1, w1), ...]
-        :return: A Cluster instance with members
-            {Member([r0, g0, b0, w0]), Member([r1, g1, b1, w1]), ...}
-        """
-        return cls(Member.new_members(stacked_vectors))
-
-    def __iter__(self) -> Iterator[Member]:
-        """Iterate over members.
-
-        :return: None
-        :yield: Members
-        """
-        return iter(self.members)
-
-    @functools.cached_property
-    def as_array(self) -> FPArray:
-        """Cluster as an array of member arrays.
-
-        :return: array of member arrays [[x, y, z, w], [x, y, z, w], ...]
-        """
-        return np.array([m.as_array for m in self.members if m.w])
-
-    @functools.cached_property
-    def as_member(self) -> Member:
-        """Get cluster as a Member instance.
-
-        :return: Member instance with median rgb and sum weight of cluster members
-        """
-        vss, ws = self.vss, self.ws
-        rgbw = np.array([*get_stacked_medians(vss, ws), sum(w for w, in ws)])
-        return Member(rgbw)
-
-    @property
-    def vs(self) -> tuple[float, ...]:
-        """Values for cluster as a member instance.
-
-        :return: tuple of values (r, g, b) from self.as_member((r, g, b, w))
-        """
-        return self.as_member.vs
-
-    @property
-    def w(self) -> float:
-        """Total weight of members.
-
-        :return: total weight of members
-        """
-        return self.as_member.w
-
-    @property
-    def exemplar(self) -> tuple[float, ...]:
-        """Get cluster exemplar.
-
-        :return: the weighted average of all members.
-
-        If I strictly followed my own conventions, I'd just call this property `vs`,
-        but this value acts as the exemplar when clustering, so I prefer to use this
-        alias in my clustering code.
-        """
-        return self.vs
-
-    @functools.cached_property
-    def exemplar_lab(self) -> tuple[float, float, float]:
-        """The color description used for Cie distance.
-
-        :return: Lab color tuple
-        """
-        r, g, b = self.exemplar
-        return rgb_to_lab((r, g, b))
-
-    @functools.cached_property
-    def _np_linalg_eig(self) -> tuple[FPArray, FPArray]:
-        """Cache the value of np.linalg.eig on the covariance matrix of the cluster.
-
-        :return: tuple of eigenvalues and eigenvectors
-        """
-        vss, ws = self.vss, self.ws
-        frequencies = np.clip(ws.flatten(), 1, None).astype(int)
-        covariance_matrix: FPArray = np.cov(vss.T, fweights=frequencies)
-        eigenvalues, eigenvectors = np.linalg.eig(covariance_matrix)
-        return np.real(eigenvalues), np.real(eigenvectors)
-
-    @property
-    def _variance(self) -> float:
-        """Get the variance of the cluster.
-
-        :return: variance of the cluster
-        """
-        return max(self._np_linalg_eig[0])
-
-    @property
-    def _direction_of_highest_variance(self) -> FPArray:
-        """Get the first Eigenvector of the covariance matrix.
-
-        :return: first Eigenvector of the covariance matrix
-
-        Return the normalized eigenvector with the largest eigenvalue.
-        """
-        eigenvalues, eigenvectors = self._np_linalg_eig
-        return eigenvectors[:, np.argmax(eigenvalues)]
-
-    @functools.cached_property
-    def quick_error(self) -> float:
-        """Product of variance and weight as a rough cost metric.
-
-        :return: product of max dimension and weight
-
-        This is the error used to determine if a cluster should be split in the
-        cutting pre-clustering step. For that purpose, it is superior to sum squared
-        error, because you *want* to isolate outliers in the cutting step.
-        """
-        if len(self.members) == 1:
-            return 0.0
-        return self._variance * self.w
-
-    @functools.cached_property
-    def is_splittable(self) -> bool:
-        """Can the cluster be split?
-
-        :return: True if the cluster can be split
-
-        If the cluster contains at least two members with non-zero weight, those
-        members will end up in separate clusters when split. 0-weight members are
-        tracers. A cluster with only tracers is invalid.
-        """
-        qualifying_members = (x for x in self.members if x.w)
-        try:
-            _ = next(qualifying_members)
-            _ = next(qualifying_members)
-        except StopIteration:
-            return False
-        else:
-            return True
-
-    def split(self) -> Annotated[set[Cluster], "doubleton"]:
-        """Split cluster into two clusters.
-
-        :return: two new clusters
-        :raises ValueError: if cluster has only one member
-
-        Split the cluster into two clusters by the plane perpendicular to the axis of
-        highest variance.
-
-        The splitting is a bit funny due to innate characteristice of the stacked
-        median. It is possible to get a split with members
-            a) on one side of the splitting plane; and
-            b) exactly on the splitting plane.
-        See stacked_quantile module for details, but that case is covered here.
-        """
-        if self._children is not None:
-            return self._children
-
-        if not self.is_splittable:
-            msg = "Cannot split a cluster with only one weighted member"
-            raise ValueError(msg)
-
-        abc = self._direction_of_highest_variance
-
-        def get_rel_dist(rgb: VectorLike) -> float:
-            """Get relative distance of rgb from plane Ax + By + Cz + 0.
-
-            :param rgb: color to get distance from plane
-            :return: relative distance of rgb from plane
-            """
-            return np.dot(abc, rgb)
-
-        scored = [(get_rel_dist(member.vs), member) for member in self.members]
-        median_score = get_stacked_median(
-            np.array([s for s, _ in scored]), np.array([m.w for _, m in scored])
-        )
-        left = {m for s, m in scored if s < median_score}
-        right = {m for s, m in scored if s > median_score}
-        center = {m for s, m in scored if s == median_score}
-        if center and sum(m.w for m in left) < sum(m.w for m in right):
-            left |= center
-        else:
-            right |= center
-        self._children = {Cluster(left), Cluster(right)}
-        return set(self._children)
-
-    def se(self, member_candidate: Member) -> float:
-        """Get the cost of adding a member to this cluster.
-
-        :param member_candidate: Member instance
-        :return: cost of adding member to this cluster
-        """
-        return _get_squared_error(member_candidate.vs, self.exemplar)
-
-    @functools.cached_property
-    def sse(self) -> float:
-        """Get the sum of squared errors of all members.
-
-        :return: sum of squared errors of all members
-        """
-        return sum(self.se(member) * member.w for member in self.members)
-
-    def process_queue(self) -> Cluster:
-        """Process the add and sub queues and update exemplars.
-
-        :return: self or a new cluster
-        """
-        if self.queue_add or self.queue_sub:
-            new_members = self.members - self.queue_sub | self.queue_add
-            # reset state in case we revert back to this cluster with sync()
-            self.exemplar_age = 0
-            self.queue_add.clear()
-            self.queue_sub.clear()
-            return Cluster(new_members)
-        self.exemplar_age += 1
-        return self
 
 
 def _get_cluster_delta_e_cie2000(cluster_a: Cluster, cluster_b: Cluster) -> float:
@@ -296,10 +37,8 @@ def _get_cluster_delta_e_cie2000(cluster_a: Cluster, cluster_b: Cluster) -> floa
     :param cluster_b: Cluster
     :return: perceptual distance from cluster_a.exemplar to cluster_b.exemplar
     """
-    labcolor_a = cluster_a.exemplar_lab
-    labcolor_b = cluster_b.exemplar_lab
-    dist_ab = get_delta_e_lab(labcolor_a, labcolor_b)
-    dist_ba = get_delta_e_lab(labcolor_b, labcolor_a)
+    dist_ab = get_delta_e_lab(cluster_a.lab, cluster_b.lab)
+    dist_ba = get_delta_e_lab(cluster_b.lab, cluster_a.lab)
     return max(dist_ab, dist_ba)
 
 
@@ -715,10 +454,10 @@ class Supercluster:
         """
         if len(cluster.members) == 1:
             return set()
-        if cluster.exemplar_age == 0:
+        if cluster.is_new:
             others = {x for x in self.clusters if x is not cluster}
         else:
-            others = {x for x in self.clusters if x.exemplar_age == 0}
+            others = {x for x in self.clusters if x.is_new}
         if not others:
             return others
 
@@ -756,7 +495,7 @@ class Supercluster:
         """
         if len(self) in {0, 1}:
             return False
-        if all(x.exemplar_age > 0 for x in self.clusters):
+        if all(not x.is_new for x in self.clusters):
             return False
         for cluster in self.clusters:
             self._offer_members(cluster)

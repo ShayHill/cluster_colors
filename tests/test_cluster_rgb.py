@@ -91,7 +91,7 @@ def show_clusters(clusters: Iterable[Cluster]) -> None:
     colors = plt.cm.rainbow(np.linspace(0, 1, len(clusters)))  # type: ignore
     colors = stack_vectors(colors)  # type: ignore
     for cluster, color in zip(clusters, colors):
-        points = cluster.as_array[:, :2]
+        points = cluster._vss
         xs = [x for x, _ in points]
         ys = [y for _, y in points]
         plt.scatter(xs, ys, color=color)  # type: ignore
