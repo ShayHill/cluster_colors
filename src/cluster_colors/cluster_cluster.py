@@ -15,6 +15,7 @@ from stacked_quantile import get_stacked_median, get_stacked_medians
 
 from cluster_colors.cluster_member import Member, split_members_by_plane
 from cluster_colors.distance_matrix import DistanceMatrix
+from cluster_colors.cluster_member import Members
 
 _RGB = tuple[float, float, float]
 
@@ -22,6 +23,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
     from cluster_colors.type_hints import FPArray, VectorLike, Vector
+
 
 def _cmp(a: float, b: float) -> Literal[-1, 0, 1]:
     """Compare two floats.
@@ -66,29 +68,39 @@ class Cluster:
     attributes are intended to be mutable.
     """
 
-    def __init__(self, members: Iterable[Member]) -> None:
-        """Initialize a Cluster instance.
+    # def __init__(self, members: Iterable[Member]) -> None:
+    #     """Initialize a Cluster instance.
 
-        :param members: Member instances
-        :raise ValueError: if members is empty
+    #     :param members: Member instances
+    #     :raise ValueError: if members is empty
+    #     """
+    #     if not members:
+    #         msg = "Cannot create an empty cluster"
+    #         raise ValueError(msg)
+    #     if not any(m.w for m in members):
+    #         msg = "Cannot create a cluster with only 0-weight members"
+    #         raise ValueError(msg)
+    #     self.members = set(members)
+
+    #     # State members to cache changes for convergence and avoid redundant
+    #     # comparisons.
+    #     self.is_new: bool = True
+    #     self.queue_add: set[Member] = set()
+    #     self.queue_sub: set[Member] = set()
+
+    #     as_array = np.array([m.as_array for m in self.members])
+    #     self._vss, self._ws = np.split(as_array, [-1], axis=1)
+    #     self._children: Annotated[set[Cluster], "doubleton"] | None = None
+
+    def __init__(self, members: Members, ixs: Iterable[int]) -> None:
+        """Identify a cluster by the indices of its members.
+
+        :param members: Members instance
+        :param ixs: indices of members
         """
-        if not members:
-            msg = "Cannot create an empty cluster"
-            raise ValueError(msg)
-        if not any(m.w for m in members):
-            msg = "Cannot create a cluster with only 0-weight members"
-            raise ValueError(msg)
-        self.members = set(members)
+        self.members = members
+        self.ixs = np.array(list(ixs), dtype=np.int32)
 
-        # State members to cache changes for convergence and avoid redundant
-        # comparisons.
-        self.is_new: bool = True
-        self.queue_add: set[Member] = set()
-        self.queue_sub: set[Member] = set()
-
-        as_array = np.array([m.as_array for m in self.members])
-        self._vss, self._ws = np.split(as_array, [-1], axis=1)
-        self._children: Annotated[set[Cluster], "doubleton"] | None = None
 
     @classmethod
     def from_stacked_vectors(cls, stacked_vectors: FPArray) -> Cluster:
@@ -138,17 +150,52 @@ class Cluster:
         """
         return self.as_member.w
 
-    @property
-    def exemplar(self) -> FPArray:
+    def _get_medoid_respecting_weights(self, ixs: Iterable[int] | None = None) -> int:
+        """Get the index of the mediod, respecting weights.
+
+        :param ixs: optional subset of members indices. I can't see a use case for
+            manually passing this, but it's here to break ties in property medoid.
+        :return: index of the mediod, respecting weights
+        """
+        ixs = self.ixs if ixs is None else np.array(list(ixs), dtype=np.int32)
+        if len(ixs) == 1:
+            return int(ixs[0])
+        return int(ixs[np.argmin(self.members.weighted_pmatrix[ixs].sum(axis=1))])
+
+    @functools.cached_property
+    def exemplar(self) -> int:
         """Get cluster exemplar.
 
-        :return: the weighted average of all members.
+        :return: the index of the exemplar with the least cost
 
         If I strictly followed my own conventions, I'd just call this property `vs`,
         but this value acts as the exemplar when clustering, so I prefer to use this
         alias in my clustering code.
         """
-        return self.vs
+        return self._get_medoid_respecting_weights()
+
+    @functools.cached_property
+    def medoid(self) -> int:
+        """Get the index of the mediod, mostly ignoring weights.
+
+        :return: index of the mediod
+
+        If multiple members are tied for cost, use weights to break the tie. This
+        will always be the case with two members, but it is theoretically possible
+        with more members. That won't happen, but it's cheap to cover the case.
+        """
+        if len(self.ixs) < 3:
+            return self._get_medoid_respecting_weights()
+
+        row_sums = self.members.pmatrix[self.ixs].sum(axis=1)
+        min_cost = np.min(row_sums)
+        arg_where_min = np.argwhere(row_sums == min_cost).flatten()
+
+        if len(arg_where_min) == 1:
+            return int(self.ixs[arg_where_min[0]])
+        else:
+            return self._get_medoid_respecting_weights(arg_where_min)
+
 
     @property
     def rgb_floats(self) -> tuple[float, float, float]:
@@ -174,16 +221,34 @@ class Cluster:
         """
         return self.as_member.lab
 
+    def _covariance_matrix(self) -> FPArray:
+        """Get the covariance matrix of the cluster.
+
+        :return: covariance matrix of the cluster
+        """
+        # vss, ws = self._vss, self._ws
+        vss = self.members.vectors[:, :-1]
+        ws = self.members.vectors[:, -1:]
+        frequencies = np.clip(ws.flatten(), 1, None).astype(int)
+        return np.cov(vss.T, fweights=frequencies)
+
+    @property
+    def covariance_matrix(self) -> FPArray:
+        """Get the covariance matrix of the cluster.
+
+        :return: covariance matrix of the cluster
+        """
+        vss = self.members.vectors[self.ixs, :-1]
+        ws = np.ceil(self.members.vectors[self.ixs, -1])
+        return np.cov(vss.T, fweights=ws)
+
     @functools.cached_property
     def _np_linalg_eig(self) -> tuple[FPArray, FPArray]:
         """Cache the value of np.linalg.eig on the covariance matrix of the cluster.
 
         :return: tuple of eigenvalues and eigenvectors
         """
-        vss, ws = self._vss, self._ws
-        frequencies = np.clip(ws.flatten(), 1, None).astype(int)
-        covariance_matrix: FPArray = np.cov(vss.T, fweights=frequencies)
-        eigenvalues, eigenvectors = np.linalg.eig(covariance_matrix)
+        eigenvalues, eigenvectors = np.linalg.eig(self.covariance_matrix)
         return np.real(eigenvalues), np.real(eigenvectors)
 
     @property
@@ -253,42 +318,16 @@ class Cluster:
             b) exactly on the splitting plane.
         See stacked_quantile module for details, but that case is covered here.
         """
-        if self._children is not None:
-            return self._children
-
-        if not self.is_splittable:
-            msg = "Cannot split a cluster with only one weighted member"
-            raise ValueError(msg)
-
         abc = self._direction_of_highest_variance
 
-        lt, gt = split_members_by_plane(self.members, abc)
-        self._children = {Cluster(lt), Cluster(gt)}
-        return self._children
+        def rel_dist(x: int) -> float:
+            return np.dot(abc, self.members.vectors[x, :-1])
 
-        # def get_rel_dist(vs: VectorLike) -> float:
-        #     """Get relative distance of rgb from plane Ax + By + Cz + 0.
-
-        #     :param vs: vector to get distance from plane Ax + By + Cz + 0
-        #     :return: relative distance of vs from plane
-        #     """
-        #     np.dot(abc, vs)
-
-
-        # scored = [(get_rel_dist(member.vs), member) for member in self.members]
-        # median_score = get_stacked_median(
-        #     np.array([s for s, _ in scored]), np.array([m.w for _, m in scored])
-        # )
-        # lteqgt: tuple[set[Member], set[Member], set[Member]] = (set(), set(), set())
-        # for score, member in scored:
-        #     lteqgt[_cmp(score, median_score) + 1].add(member)
-        # lt, eq, gt = lteqgt
-        # if gt and sum(m.w for m in lt) < sum(m.w for m in eq):
-        #     lt |= gt
-        # else:
-        #     eq |= gt
-        # self._children = {Cluster(lt), Cluster(eq)}
-        # return self._children
+        sorted_along_dhv = sorted(self.ixs, key=rel_dist)
+        return {
+                Cluster(self.members, sorted_along_dhv[:len(self.ixs)//2]),
+                Cluster(self.members, sorted_along_dhv[len(self.ixs)//2:]),
+        }
 
     def se(self, member_candidate: Member) -> float:
         """Get the cost of adding a member to this cluster.

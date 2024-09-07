@@ -12,10 +12,10 @@ from matplotlib import pyplot as plt
 
 # pyright: reportPrivateUsage=false
 import cluster_colors.clusters
-from cluster_colors.cluster_member import Member
+from cluster_colors.cluster_member import Member, Members
 from cluster_colors.clusters import Cluster
 from cluster_colors.vector_stacker import  stack_vectors
-from basic_colormath import rgb_to_lab
+from basic_colormath import rgb_to_lab, get_delta_e_matrix
 
 
 
@@ -65,20 +65,28 @@ class TestClusterExemplar:
 
     def test_exemplar(self) -> None:
         """Return weighted average of member.rgb values."""
-        cluster = cluster_colors.clusters.Cluster(
-            {Member(np.array([1, 2, 3, 2])), Member(np.array([4, 5, 6, 1]))}
-        )
-        np.testing.assert_array_equal(cluster.exemplar, (1, 2, 3))
+        vectors = np.array([[1, 2, 3, 1], [4, 5, 6, 2], [7, 8, 9, 3]])
+        members = Members.from_stacked_vectors(vectors)
+        cluster = Cluster(members, [0, 2])
+        np.testing.assert_array_equal(cluster.exemplar, 2)
+
+    def test_medoid(self) -> None:
+        """Return the member with lowest cost, ignoring weights."""
+        vectors = np.array([[1, 2, 3, 1], [4, 5, 6, 2], [7, 8, 9, 3]])
+        members = Members.from_stacked_vectors(vectors)
+        cluster = Cluster(members, [0, 1, 2])
+        np.testing.assert_array_equal(cluster.medoid, 1)
 
 
 class TestCluster:
+
     def test_split(self) -> None:
         """Return 256 clusters given 256 colors."""
-        members = Member.new_members(np.random.randint(1, 255, (50, 3)))  # type: ignore
-        cluster = Cluster(members)
-        clusters = cluster.split()
-        clusters = set.union(*(c.split() for c in clusters))  # type: ignore
-        show_clusters(clusters)  # type: ignore
+        vectors = np.random.rand(50, 4) * 255
+        members = Members.from_stacked_vectors(vectors)
+        cluster = Cluster(members, range(50))
+        child_a, child_b = cluster.split()
+        assert set(child_a.ixs) | set(child_b.ixs) == set(cluster.ixs)
 
 
 def show_clusters(clusters: Iterable[Cluster]) -> None:

@@ -11,14 +11,75 @@ not 3 values long.
 from __future__ import annotations
 
 import functools as ft
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, Callable, Iterable
 import numpy as np
+from numpy import typing as npt
 from stacked_quantile import get_stacked_median, get_stacked_medians
+from basic_colormath import get_delta_e_matrix, get_sqeuclidean_matrix
 
 from basic_colormath import float_tuple_to_8bit_int_tuple, rgb_to_lab
+import functools
 
 if TYPE_CHECKING:
-    from cluster_colors.type_hints import FPArray, StackedVectors, Vector, VectorLike
+    from cluster_colors.type_hints import FPArray, StackedVectors, Vector, VectorLike, ProximityMatrix
+
+
+class Members:
+    """A list of cluster members with a proximity matrix.
+
+    :param members: list of members
+    :param f_proximity: function that returns a proximity matrix
+    """
+
+    def __init__(
+        self,
+        vectors: Iterable[Iterable[float]],
+        *,
+        weights: Iterable[float] | None = None,
+        pmatrix: ProximityMatrix | None = None,
+    ) -> None:
+        """Create a new Members instance.
+
+        :param vectors: array (n, m) of vectors
+        :param weights: optional array (n,) of weights
+        :param pmatrix: optional proximity matrix. If not given, will be calculated
+            with squared Euclidean distance
+        """
+        self.vectors = np.array(list(map(list, vectors))).astype(float)
+
+        if weights is None:
+            self.weights = np.ones(len(self.vectors))
+        else:
+            self.weights = np.array(list(weights))
+        if pmatrix is None:
+            self.pmatrix = get_sqeuclidean_matrix(self.vectors)
+        else:
+            self.pmatrix = pmatrix
+
+    @functools.cached_property
+    def weighted_pmatrix(self) -> ProximityMatrix:
+        """Proximity matrix with weights applied.
+
+        :return: proximity matrix such that sum(pmatrix[i, (j, k, ...)]) is the cost
+            of members[i] in a cluster with members[i, j, k, ...]
+        """
+        weight_columns = np.tile(self.weights, (len(self.weights), 1))
+        return self.pmatrix * weight_columns
+
+    @classmethod
+    def from_stacked_vectors(
+        cls, stacked_vectors: StackedVectors, *, pmatrix: FPArray | None = None
+    ) -> Members:
+        """Create a Members instance from stacked_vectors.
+
+        :param stacked_vectors: (n, m + 1) a list of vectors with weight channels in
+            the last axis
+        :return: Members instance
+        """
+        return cls(
+            stacked_vectors[:, :-1], weights=stacked_vectors[:, -1], pmatrix=pmatrix
+        )
+
 
 def _cmp(a: float, b: float) -> Literal[-1, 0, 1]:
     """Compare two floats.
@@ -33,6 +94,7 @@ def _cmp(a: float, b: float) -> Literal[-1, 0, 1]:
     if cmp == 1:
         return 1
     return 0
+
 
 class Member:
     """A member of a cluster.
@@ -115,7 +177,9 @@ class Member:
         return {Member(v) for v in stacked_vectors if v[-1]}
 
 
-def split_members_by_plane(members: set[Member], abc: FPArray) -> tuple[set[Member], set[Member]]:
+def split_members_by_plane(
+    members: set[Member], abc: FPArray
+) -> tuple[set[Member], set[Member]]:
     """Split members into two sets based on their relative distance from a plane.
 
     :param members: set of Member instances
