@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from paragraphs import par
 import bisect
 import functools
 import itertools as it
@@ -252,9 +253,23 @@ class Supercluster:
         """Return the maximum number of clusters in the Supercluster instance."""
         return len(self._states)
 
-    def get_state(self, i: int) -> list[tuple[int, ...]]:
-        """Return the current number of clusters in the Supercluster instance."""
-        return self._states[i - 1]
+    def get_state(self, n: int) -> list[tuple[int, ...]]:
+        """Get the cached state of the Supercluster with n clusters.
+
+        :param n: number of clusters in the state
+        :return: the state with n clusters
+        :raise IndexError: if the state has not been cached
+
+        This is a 1-based index. The first state is the state with one cluster.
+        """
+        try:
+            return self._states[n - 1]
+        except IndexError as e:
+            msg = par(
+                f"""State {n} has not been cached. The maximum cached state is
+                {len(self._states)}."""
+            )
+            raise IndexError(msg) from e
 
     def cache_current_state(self) -> None:
         """Cache the current state of the Supercluster instance."""
@@ -288,16 +303,38 @@ class Supercluster:
         """Split until the minimum intercluster proximity is at least min_proximity."""
         while self.get_min_intercluster_proximity() < min_proximity:
             try:
-                self.split_cluster()
+                self.split_next_cluster()
             except AllClustersAreSingletonsError:
                 break
 
-    def restore_state(self, i: int) -> None:
-        """Restore the state of the Supercluster instance.
+    def _restore_state_to_at_most_n(self, n: int) -> None:
+        n = min(len(self._states), n)
+        self.restore_cached_state(n)
+
+    def _set_state_to_n_or_more(self, n: int) -> None:
+        # fast forward through cached states
+        self._restore_state_to_at_most_n(n)
+        # split to create new states
+        while len(self.clusters) < n:
+            cluster = self.next_to_split
+            del self.clusters[cluster]
+            self.clusters.update({c: None for c in cluster.split()})
+            self.converge()
+            self.cache_current_state()
+
+    def set_state(self, n: int) -> None:
+        self._set_state_to_n_or_more(n)
+        self.restore_cached_state(n)
+
+    def restore_cached_state(self, n: int) -> None:
+        """Restore a previous state of the Supercluster instance.
 
         :param state: state to restore
+        :raise IndexError: if the state has not been cached
         """
-        state = self.get_state(i)
+        if n == len(self.clusters):
+            return
+        state = self.get_state(n)
         self.clusters = {Cluster(self.members, ixs=ixs): None for ixs in state}
 
     @property
@@ -315,35 +352,41 @@ class Supercluster:
             raise AllClustersAreSingletonsError()
         return candidate
 
-    def split_cluster(self, n: int | None = None):
-        """Split one cluster."""
-        n = n or len(self.clusters) + 1
-        if n <= self.at_state:
-            return
+    def split_next_cluster(self):
+        """Split the cluster with the highest sum error.
 
-        if len(self._states) > len(self.clusters):
-            self.restore_state(min(len(self._states), n))
+        This sets the state of the Supercluster instance. If the state is already
+        >=n, nothing happens.
+        """
+        self._set_state_to_n_or_more(len(self.clusters) + 1)
 
-        while len(self.clusters) < n:
-            cluster = self.next_to_split
-            del self.clusters[cluster]
-            self.clusters.update({c: None for c in cluster.split()})
-            self.converge()
-            self.cache_current_state()
+    def converge(self, _previous_states: set[tuple[int, ...]] | None = None):
+        """Redistribute members between clusters.
 
-    def converge(self, _seen: set[tuple[int, ...]] | None = None):
-        """Redistribute members between clusters."""
-        seen = _seen or set()
-        pmat = self.members.pmatrix
+        :param _previous_states: set of cluster states that have already been seen.
+            For recursion use only
 
+        Recursively redistribute members between clusters until no member can be
+        moved to a different cluster to reduce the total error. This is a recursive
+        method.
+
+        Convergence uses the cluster medoid, not the cluster exemplar. This allows
+        the clusters a bit more mobility, so the separation of two heavy,
+        nearly-identical clusters is not destiny.
+
+        A record of previous states prevents infinite recursion between a few states.
+        It is conceivable that conversion could fail in other cases. The recursion
+        limit is set to the Python's recursion limit.
+        """
         medoids = [c.medoid for c in self.clusters]
-        snap = tuple(sorted(medoids))
-        if snap in seen:
+
+        previous_states = _previous_states or set()
+        state = tuple(sorted(medoids))
+        if state in previous_states:
             return
-        seen.add(snap)
+        previous_states.add(state)
 
-        which_medoid = np.argmin(pmat[medoids], axis=0)
-
+        which_medoid = np.argmin(self.members.pmatrix[medoids], axis=0)
         for i, cluster in enumerate(tuple(self.clusters)):
             new_where = np.argwhere(which_medoid == i)
             new = list(map(int, new_where.flatten()))
@@ -352,8 +395,7 @@ class Supercluster:
                 self.clusters[Cluster(self.members, new)] = None
 
         with suppress(RecursionError):
-            self.converge(seen)
-
+            self.converge(previous_states)
 
     def __iter__(self) -> Iterator[Cluster]:
         """Iterate over clusters.
