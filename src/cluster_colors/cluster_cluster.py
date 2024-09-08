@@ -105,7 +105,7 @@ class Cluster:
         if ixs is None:
             self.ixs = np.arange(len(self.members), dtype=np.int32)
         else:
-            self.ixs = np.array(list(ixs), dtype=np.int32)
+            self.ixs = np.array(sorted(ixs), dtype=np.int32)
         self._sn = next(_sn_gen)
 
     def __len__(self) -> int:
@@ -414,3 +414,4 @@ class Cluster:
             return Cluster(new_members)
         self.is_new = False
         return self
+

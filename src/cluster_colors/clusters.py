@@ -6,16 +6,20 @@
 
 from __future__ import annotations
 
+import bisect
 import functools
-from typing import TYPE_CHECKING, Annotated, Literal, NamedTuple, TypeVar
+import itertools as it
+from contextlib import suppress
+from typing import TYPE_CHECKING, Annotated, Literal, NamedTuple, TypeVar, cast
 
 import numpy as np
 from basic_colormath import get_delta_e_lab, get_sqeuclidean, rgb_to_lab
+from numpy import typing as npt
 from paragraphs import par
 from stacked_quantile import get_stacked_median, get_stacked_medians
 
 from cluster_colors.cluster_cluster import Cluster
-from cluster_colors.cluster_member import Member
+from cluster_colors.cluster_member import Member, Members
 from cluster_colors.distance_matrix import DistanceMatrix
 
 _RGB = tuple[float, float, float]
@@ -23,7 +27,23 @@ _RGB = tuple[float, float, float]
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
-    from cluster_colors.type_hints import FPArray, Vector, VectorLike
+    from cluster_colors.type_hints import (
+        FPArray,
+        ProximityMatrix,
+        StackedVectors,
+        Vector,
+        VectorLike,
+    )
+
+
+class AllClustersAreSingletonsError(Exception):
+    """Exception raised when no clusters can be split."""
+
+    def __init__(
+        self, message: str = "Cannot split any cluster. All clusters are singletons."
+    ) -> None:
+        self.message = message
+        super().__init__(self.message)
 
 
 def _get_cluster_delta_e_cie2000(cluster_a: Cluster, cluster_b: Cluster) -> float:
@@ -204,23 +224,84 @@ class Supercluster:
     and queue_sub sets then applied with Supercluster.process_queues.
     """
 
-    def __init__(self, *members: Iterable[Member]) -> None:
+    def __init__(self, members: Members) -> None:
         """Create a new Supercluster instance.
 
+        TODO: update Supercluster.__init__ docstring
         :param members: initial members. All are combined into one cluster. Multiple
         arguments allowed.
-        """
-        all_members = set(members[0]).union(*(set(ms) for ms in members[1:]))
-        self.clusters: set[Cluster] = set()
-        self.spans: DistanceMatrix[Cluster]
-        self.spans = DistanceMatrix(_get_cluster_delta_e_cie2000)
-        self._add(Cluster(all_members))
 
-        self._states = StatesCache(self)
-        self._next_to_split: set[Cluster] = set()
+        TODO: document why clusters are kept in a dictionary, not a set
+        """
+        self.members = members
+        self.clusters = {Cluster(members): None}
+        self._states: list[list[tuple[int, ...]]] = [[]]
+        self.cache_current_state()
+        # self.merge_states: list[set[tuple[int, ...]]] = []
+
+    def __len__(self) -> int:
+        """Return the number of clusters in the Supercluster instance."""
+        return len(self.clusters)
 
     @property
-    def next_to_split(self) -> set[Cluster]:
+    def at_state(self) -> int:
+        return len(self.clusters)
+
+    @property
+    def max_state(self) -> int:
+        """Return the maximum number of clusters in the Supercluster instance."""
+        return len(self._states)
+
+    def get_state(self, i: int) -> list[tuple[int, ...]]:
+        """Return the current number of clusters in the Supercluster instance."""
+        return self._states[i - 1]
+
+    def cache_current_state(self) -> None:
+        """Cache the current state of the Supercluster instance."""
+        if len(self._states) == len(self.clusters):
+            self._states.append([tuple(c.ixs) for c in self.clusters])
+        elif len(self._states) < len(self.clusters):
+            msg = "len(self._states) != self.at_state. Previous state not cached."
+            raise ValueError(msg)
+
+    @classmethod
+    def from_stacked_vectors(
+        cls: type[_SuperclusterT],
+        stacked_vectors: StackedVectors,
+        pmatrix: ProximityMatrix | None = None,
+    ) -> _SuperclusterT:
+        members = Members.from_stacked_vectors(stacked_vectors, pmatrix=pmatrix)
+        return cls(members)
+
+    @property
+    def as_cluster(self) -> Cluster:
+        """Return the members as a numpy array."""
+        ixs = [c.exemplar for c in self.clusters]
+        return Cluster(self.members, ixs=ixs)
+
+    def get_min_intercluster_proximity(self) -> float:
+        """Return the minimum span between clusters."""
+        ixs = [c.exemplar for c in self.clusters]
+        return min(self.members.weighted_pmatrix[ixs].sum(axis=1))
+
+    def split_to_intercluster_proximity(self, min_proximity: float):
+        """Split until the minimum intercluster proximity is at least min_proximity."""
+        while self.get_min_intercluster_proximity() < min_proximity:
+            try:
+                self.split_cluster()
+            except AllClustersAreSingletonsError:
+                break
+
+    def restore_state(self, i: int) -> None:
+        """Restore the state of the Supercluster instance.
+
+        :param state: state to restore
+        """
+        state = self.get_state(i)
+        self.clusters = {Cluster(self.members, ixs=ixs): None for ixs in state}
+
+    @property
+    def next_to_split(self) -> Cluster:
         """Return the next set of clusters to split.
 
         :return: set of clusters with sse == max(sse)
@@ -229,28 +310,50 @@ class Supercluster:
         These will be the clusters (multiple if tie, which should be rare) with the
         highest sse.
         """
-        self._next_to_split &= self.clusters
-        if self._next_to_split:
-            return self._next_to_split
+        candidate = max(self.clusters, key=lambda c: c.error_metric)
+        if candidate.error == 0:
+            raise AllClustersAreSingletonsError()
+        return candidate
 
-        candidates = [c for c in self if c.is_splittable]
-        if not candidates:
-            msg = "No clusters can be split"
-            raise ValueError(msg)
-        max_error = max(c.sse for c in candidates)
-        self._next_to_split = {c for c in candidates if c.sse == max_error}
-        return self._next_to_split
+    def split_cluster(self, n: int | None = None):
+        """Split one cluster."""
+        n = n or len(self.clusters) + 1
+        if n <= self.at_state:
+            return
 
-    @classmethod
-    def from_stacked_vectors(
-        cls: type[_SuperclusterT], stacked_vectors: FPArray
-    ) -> _SuperclusterT:
-        """Create a Supercluster instance from an iterable of colors.
+        if len(self._states) > len(self.clusters):
+            self.restore_state(min(len(self._states), n))
 
-        :param stacked_vectors: An iterable of vectors with a weight axis
-        :return: A Supercluster instance
-        """
-        return cls(Member.new_members(stacked_vectors))
+        while len(self.clusters) < n:
+            cluster = self.next_to_split
+            del self.clusters[cluster]
+            self.clusters.update({c: None for c in cluster.split()})
+            self.converge()
+            self.cache_current_state()
+
+    def converge(self, _seen: set[tuple[int, ...]] | None = None):
+        """Redistribute members between clusters."""
+        seen = _seen or set()
+        pmat = self.members.pmatrix
+
+        medoids = [c.medoid for c in self.clusters]
+        snap = tuple(sorted(medoids))
+        if snap in seen:
+            return
+        seen.add(snap)
+
+        which_medoid = np.argmin(pmat[medoids], axis=0)
+
+        for i, cluster in enumerate(tuple(self.clusters)):
+            new_where = np.argwhere(which_medoid == i)
+            new = list(map(int, new_where.flatten()))
+            if new != list(cluster.ixs):
+                del self.clusters[cluster]
+                self.clusters[Cluster(self.members, new)] = None
+
+        with suppress(RecursionError):
+            self.converge(seen)
+
 
     def __iter__(self) -> Iterator[Cluster]:
         """Iterate over clusters.
@@ -258,13 +361,6 @@ class Supercluster:
         :return: iterator
         """
         return iter(self.clusters)
-
-    def __len__(self) -> int:
-        """Get number of clusters.
-
-        :return: number of clusters
-        """
-        return len(self.clusters)
 
     def _add(self, *cluster_args: Cluster) -> None:
         """Add clusters to the set.
@@ -503,13 +599,13 @@ class Supercluster:
     #
     # ------------------------------------------------------------------------ #
 
-    @property
-    def as_cluster(self) -> Cluster:
-        """Return a cluster that contains all members of all clusters.
+    # @property
+    # def as_cluster(self) -> Cluster:
+    #     """Return a cluster that contains all members of all clusters.
 
-        :return: a cluster that contains all members of all clusters
+    #     :return: a cluster that contains all members of all clusters
 
-        This is a pathway to a Supercluster instance sum weight, sum exemplar, etc.
-        """
-        (cluster,) = next(self._states.fwd_enumerate()).clusters
-        return cluster
+    #     This is a pathway to a Supercluster instance sum weight, sum exemplar, etc.
+    #     """
+    #     (cluster,) = next(self._states.fwd_enumerate()).clusters
+    #     return cluster
