@@ -291,13 +291,25 @@ class Supercluster:
     @property
     def as_cluster(self) -> Cluster:
         """Return the members as a numpy array."""
-        ixs = [c.exemplar for c in self.clusters]
+        clusters = self.get_rsorted_clusters()
+        ixs = [c.exemplar for c in clusters]
         return Cluster(self.members, ixs=ixs)
+
+    @property
+    def as_vectors(self) -> FPArray:
+        """Return the members as a numpy array, sorted heaviest to lightest."""
+        return self.as_stacked_vectors[:, :-1]
+
+    @property
+    def as_stacked_vectors(self) -> StackedVectors:
+        """Return the members as a numpy array, sorted heaviest to lightest."""
+        as_stacked_vectors = self.as_cluster.as_stacked_vectors
+        return as_stacked_vectors[np.argsort(as_stacked_vectors[:, -1])][::-1]
 
     def get_min_intercluster_proximity(self) -> float:
         """Return the minimum span between clusters."""
         ixs = [c.exemplar for c in self.clusters]
-        return min(self.members.weighted_pmatrix[ixs].sum(axis=1))
+        return float(np.min(self.members.weighted_pmatrix[np.ix_(ixs, ixs)]))
 
     def split_to_intercluster_proximity(self, min_proximity: float):
         """Split until the minimum intercluster proximity is at least min_proximity."""
@@ -309,7 +321,7 @@ class Supercluster:
 
     def _restore_state_to_at_most_n(self, n: int) -> None:
         n = min(len(self._states), n)
-        self.restore_cached_state(n)
+        self._restore_state(n)
 
     def _set_state_to_n_or_more(self, n: int) -> None:
         # fast forward through cached states
@@ -322,11 +334,7 @@ class Supercluster:
             self.converge()
             self.cache_current_state()
 
-    def set_state(self, n: int) -> None:
-        self._set_state_to_n_or_more(n)
-        self.restore_cached_state(n)
-
-    def restore_cached_state(self, n: int) -> None:
+    def _restore_state(self, n: int) -> None:
         """Restore a previous state of the Supercluster instance.
 
         :param state: state to restore
@@ -336,6 +344,10 @@ class Supercluster:
             return
         state = self.get_state(n)
         self.clusters = {Cluster(self.members, ixs=ixs): None for ixs in state}
+
+    def set_state(self, n: int) -> None:
+        self._set_state_to_n_or_more(n)
+        self._restore_state(n)
 
     @property
     def next_to_split(self) -> Cluster:
@@ -553,7 +565,7 @@ class Supercluster:
         """
         return sorted(self.clusters, key=lambda c: c.w, reverse=True)
 
-    def get_rsorted_exemplars(self) -> list[tuple[float, ...]]:
+    def get_rsorted_exemplars(self) -> list[int]:
         """Return clusters from largest to smallest, breaking ties.
 
         :return: a reverse-sorted (by weight) list of cluster exemplars
@@ -563,6 +575,7 @@ class Supercluster:
         makes sure things are 100% deterministic and non-arbitrary.
         """
         return [x.exemplar for x in self.get_rsorted_clusters()]
+
 
     # ------------------------------------------------------------------------ #
     #

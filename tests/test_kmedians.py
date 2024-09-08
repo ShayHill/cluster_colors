@@ -18,6 +18,7 @@ import pytest
 
 from cluster_colors.kmedians import KMedSupercluster
 from cluster_colors.vector_stacker import stack_vectors
+from cluster_colors.clusters import Supercluster
 
 ColorsArray = Annotated[npt.NDArray[np.float_], (-1, 3)]
 
@@ -31,12 +32,13 @@ def colors(request) -> ColorsArray:
 class TestKMedians:
     def test_get_rsorted_clusters(self, colors: ColorsArray):
         """Test that the clusters are sorted by the number of colors in them"""
-        clusters = KMedSupercluster.from_stacked_vectors(colors)
-        clusters.split_to_delta_e(100/3)
-        color_clusters = clusters.get_rsorted_clusters()
+        clusters = Supercluster.from_stacked_vectors(colors)
+        clusters.split_to_intercluster_proximity(100/3)
+        _ = clusters.get_rsorted_clusters()
+        _ = clusters.as_stacked_vectors
 
     def test_get_rsorted_exemplars(self, colors: ColorsArray):
         """Test that the clusters are sorted by the number of colors in them"""
-        clusters = KMedSupercluster.from_stacked_vectors(colors)
-        clusters.split_to_delta_e(100/3)
-        colors = clusters.get_rsorted_exemplars()
+        clusters = Supercluster.from_stacked_vectors(colors)
+        clusters.split_to_intercluster_proximity(100/3)
+        _ = clusters.get_rsorted_exemplars()

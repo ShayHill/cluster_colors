@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 
 _sn_gen = itertools.count()
 
+
 def _cmp(a: float, b: float) -> Literal[-1, 0, 1]:
     """Compare two floats.
 
@@ -162,7 +163,7 @@ class Cluster:
 
         :return: total weight of members
         """
-        return self.as_member.w
+        return sum(self.members.weights[self.ixs])
 
     def _get_medoid_respecting_weights(self, ixs: Iterable[int] | None = None) -> int:
         """Get the index of the mediod, respecting weights.
@@ -197,6 +198,14 @@ class Cluster:
         return self.members.vectors[self.exemplar]
 
     @property
+    def as_vectors(self) -> FPArray:
+        """Get the members as a 2D array.
+
+        :return: members as a 2D array
+        """
+        return self.members.vectors[self.ixs]
+
+    @property
     def as_stacked_vector(self) -> Vector:
         """Get the exemplar as a stacked vector.
 
@@ -204,6 +213,15 @@ class Cluster:
         """
         weight = self.members.weights[self.exemplar]
         return np.append(self.as_vector, weight)
+
+    @property
+    def as_stacked_vectors(self) -> FPArray:
+        """Get the members as a 2D array with weights.
+
+        :return: members as a 2D array with weights
+        """
+        weights = self.members.weights[self.ixs].reshape(-1, 1)
+        return np.hstack([self.as_vectors, weights])
 
     @functools.cached_property
     def medoid(self) -> int:
@@ -414,4 +432,3 @@ class Cluster:
             return Cluster(new_members)
         self.is_new = False
         return self
-
