@@ -6,25 +6,19 @@
 
 from __future__ import annotations
 
-
 import functools
-from typing import TYPE_CHECKING, Annotated, Literal, NamedTuple, TypeVar, Callable
+import itertools
+from typing import TYPE_CHECKING, Annotated, Callable, Literal
 
 import numpy as np
-from basic_colormath import get_delta_e_lab, get_sqeuclidean, rgb_to_lab
-from paragraphs import par
-from stacked_quantile import get_stacked_median, get_stacked_medians
+from stacked_quantile import get_stacked_medians
 
-from cluster_colors.cluster_member import Member, Members, split_members_by_plane
-from cluster_colors.distance_matrix import DistanceMatrix
-import itertools
-
-_RGB = tuple[float, float, float]
+from cluster_colors.cluster_member import Member, Members
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
-    from cluster_colors.type_hints import FPArray, StackedVectors, Vector, VectorLike
+    from cluster_colors.type_hints import FPArray, StackedVectors, Vector
 
 
 _sn_gen = itertools.count()
@@ -73,31 +67,6 @@ def _split_floats(floats: Iterable[float]) -> int:
     return converge(len(floats) // 2)
 
 
-def _cmp(a: float, b: float) -> Literal[-1, 0, 1]:
-    """Compare two floats.
-
-    :param a: float
-    :param b: float
-    :return: -1 if a < b, 0 if a == b, 1 if a > b
-    """
-    cmp = int(a > b) - int(a < b)
-    if cmp == -1:
-        return -1
-    if cmp == 1:
-        return 1
-    return 0
-
-
-def _get_squared_error(vector_a: Vector, vector_b: Vector) -> np.float64:
-    """Get squared distance between two vectors.
-
-    :param vector_a: (-1,) vector
-    :param vector_b: (-1,) vector
-    :return: squared Euclidian distance from vector_a to vector_b
-    """
-    return np.sum((vector_a - vector_b) ** 2)
-
-
 class Cluster:
     """A cluster of Member instances.
 
@@ -115,30 +84,6 @@ class Cluster:
     This is almost a frozen class, but the queue_add, queue_sub, and exemplar_age
     attributes are intended to be mutable.
     """
-
-    # def __init__(self, members: Iterable[Member]) -> None:
-    #     """Initialize a Cluster instance.
-
-    #     :param members: Member instances
-    #     :raise ValueError: if members is empty
-    #     """
-    #     if not members:
-    #         msg = "Cannot create an empty cluster"
-    #         raise ValueError(msg)
-    #     if not any(m.w for m in members):
-    #         msg = "Cannot create a cluster with only 0-weight members"
-    #         raise ValueError(msg)
-    #     self.members = set(members)
-
-    #     # State members to cache changes for convergence and avoid redundant
-    #     # comparisons.
-    #     self.is_new: bool = True
-    #     self.queue_add: set[Member] = set()
-    #     self.queue_sub: set[Member] = set()
-
-    #     as_array = np.array([m.as_array for m in self.members])
-    #     self._vss, self._ws = np.split(as_array, [-1], axis=1)
-    #     self._children: Annotated[set[Cluster], "doubleton"] | None = None
 
     def __init__(self, members: Members, ixs: Iterable[int] | None = None) -> None:
         """Identify a cluster by the indices of its members.
@@ -194,14 +139,6 @@ class Cluster:
     # ===========================================================================
 
     @property
-    def vs(self) -> FPArray:
-        """Values for cluster as a member instance.
-
-        :return: tuple of values (r, g, b) from self.as_member((r, g, b, w))
-        """
-        return self.as_member.vs
-
-    @property
     def w(self) -> float:
         """Total weight of members.
 
@@ -232,6 +169,28 @@ class Cluster:
         alias in my clustering code.
         """
         return self._get_medoid_respecting_weights()
+
+    @functools.cached_property
+    def medoid(self) -> int:
+        """Get the index of the mediod, mostly ignoring weights.
+
+        :return: index of the mediod
+
+        If multiple members are tied for cost, use weights to break the tie. This
+        will always be the case with two members, but it is theoretically possible
+        with more members. That won't happen, but it's cheap to cover the case.
+        """
+        if len(self.ixs) < 3:
+            return self._get_medoid_respecting_weights()
+
+        row_sums = self.members.pmatrix[self.ixs].sum(axis=1)
+        min_cost = np.min(row_sums)
+        arg_where_min = np.argwhere(row_sums == min_cost).flatten()
+
+        if len(arg_where_min) == 1:
+            return int(self.ixs[arg_where_min[0]])
+        else:
+            return self._get_medoid_respecting_weights(arg_where_min)
 
     @property
     def as_vector(self) -> Vector:
@@ -267,63 +226,6 @@ class Cluster:
         weights = self.members.weights[self.ixs].reshape(-1, 1)
         return np.hstack([self.as_vectors, weights])
 
-    @functools.cached_property
-    def medoid(self) -> int:
-        """Get the index of the mediod, mostly ignoring weights.
-
-        :return: index of the mediod
-
-        If multiple members are tied for cost, use weights to break the tie. This
-        will always be the case with two members, but it is theoretically possible
-        with more members. That won't happen, but it's cheap to cover the case.
-        """
-        if len(self.ixs) < 3:
-            return self._get_medoid_respecting_weights()
-
-        row_sums = self.members.pmatrix[self.ixs].sum(axis=1)
-        min_cost = np.min(row_sums)
-        arg_where_min = np.argwhere(row_sums == min_cost).flatten()
-
-        if len(arg_where_min) == 1:
-            return int(self.ixs[arg_where_min[0]])
-        else:
-            return self._get_medoid_respecting_weights(arg_where_min)
-
-    @property
-    def rgb_floats(self) -> tuple[float, float, float]:
-        """Get the exemplar as a tuple of floats.
-
-        :return: exemplar as a tuple of floats
-        """
-        return self.as_member.rgb_floats
-
-    @property
-    def rgb(self) -> tuple[int, int, int]:
-        """Get the exemplar as a tuple of 8-bit integers.
-
-        :return: exemplar as a tuple of 8-bit integers
-        """
-        return self.as_member.rgb
-
-    @property
-    def lab(self) -> tuple[float, float, float]:
-        """Get the exemplar as a tuple of CIELAB floats.
-
-        :return: exemplar as a tuple of CIELAB floats
-        """
-        return self.as_member.lab
-
-    def _covariance_matrix(self) -> FPArray:
-        """Get the covariance matrix of the cluster.
-
-        :return: covariance matrix of the cluster
-        """
-        # vss, ws = self._vss, self._ws
-        vss = self.members.vectors[:, :-1]
-        ws = self.members.vectors[:, -1:]
-        frequencies = np.clip(ws.flatten(), 1, None).astype(int)
-        return np.cov(vss.T, fweights=frequencies)
-
     @property
     def covariance_matrix(self) -> FPArray:
         """Get the covariance matrix of the cluster.
@@ -340,19 +242,8 @@ class Cluster:
 
         :return: tuple of eigenvalues and eigenvectors
         """
-        try:
-            eigenvalues, eigenvectors = np.linalg.eig(self.covariance_matrix)
-            return np.real(eigenvalues), np.real(eigenvectors)
-        except:
-            breakpoint()
-
-    @property
-    def _variance(self) -> float:
-        """Get the variance of the cluster.
-
-        :return: variance of the cluster
-        """
-        return max(self._np_linalg_eig[0])
+        eigenvalues, eigenvectors = np.linalg.eig(self.covariance_matrix)
+        return np.real(eigenvalues), np.real(eigenvectors)
 
     @property
     def _direction_of_highest_variance(self) -> FPArray:
@@ -385,40 +276,6 @@ class Cluster:
         Ties aren't likely, but just to keep everything deterministic.
         """
         return self.error, -self._sn
-
-    @functools.cached_property
-    def quick_error(self) -> float:
-        """Product of variance and weight as a rough cost metric.
-
-        :return: product of max dimension and weight
-
-        This is the error used to determine if a cluster should be split in the
-        cutting pre-clustering step. For that purpose, it is superior to sum squared
-        error, because you *want* to isolate outliers in the cutting step.
-        """
-        if len(self.members) == 1:
-            return 0.0
-        return self._variance * self.w
-
-    # TODO: create a test with some 0-weight members
-    @functools.cached_property
-    def is_splittable(self) -> bool:
-        """Can the cluster be split?
-
-        :return: True if the cluster can be split
-
-        If the cluster contains at least two members with non-zero weight, those
-        members will end up in separate clusters when split. 0-weight members are
-        tracers. A cluster with only tracers is invalid.
-        """
-        qualifying_members = (x for x in self.members if x.w)
-        try:
-            _ = next(qualifying_members)
-            _ = next(qualifying_members)
-        except StopIteration:
-            return False
-        else:
-            return True
 
     def split(self) -> Annotated[set[Cluster], "doubleton"]:
         """Split cluster into two clusters.
@@ -454,34 +311,3 @@ class Cluster:
             Cluster(self.members, sorted_along_ahv[: len(self.ixs) // 2]),
             Cluster(self.members, sorted_along_ahv[len(self.ixs) // 2 :]),
         }
-
-    def se(self, member_candidate: Member) -> float:
-        """Get the cost of adding a member to this cluster.
-
-        :param member_candidate: Member instance
-        :return: cost of adding member to this cluster
-        """
-        return _get_squared_error(member_candidate.vs, self.exemplar)
-
-    @functools.cached_property
-    def sse(self) -> float:
-        """Get the sum of squared errors of all members.
-
-        :return: sum of squared errors of all members
-        """
-        return sum(self.se(member) * member.w for member in self.members)
-
-    def process_queue(self) -> Cluster:
-        """Process the add and sub queues and update exemplars.
-
-        :return: self or a new cluster
-        """
-        if self.queue_add or self.queue_sub:
-            new_members = self.members - self.queue_sub | self.queue_add
-            # reset state in case we revert back to this cluster with sync()
-            self.is_new = True
-            self.queue_add.clear()
-            self.queue_sub.clear()
-            return Cluster(new_members)
-        self.is_new = False
-        return self

@@ -6,43 +6,21 @@
 
 from __future__ import annotations
 
-from paragraphs import par
-import bisect
-import functools
-import itertools as it
 from contextlib import suppress
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Literal,
-    NamedTuple,
-    TypeVar,
-    cast,
-    Callable,
-)
+from typing import TYPE_CHECKING, Callable, TypeVar
 
 import numpy as np
-from basic_colormath import get_delta_e_lab, get_sqeuclidean, rgb_to_lab
-from numpy import typing as npt
 from paragraphs import par
-from stacked_quantile import get_stacked_median, get_stacked_medians
 
 from cluster_colors.cluster_cluster import Cluster
-from cluster_colors.cluster_member import Member, Members
-from cluster_colors.distance_matrix import DistanceMatrix
+from cluster_colors.cluster_member import Members
 
 _RGB = tuple[float, float, float]
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    pass
 
-    from cluster_colors.type_hints import (
-        FPArray,
-        ProximityMatrix,
-        StackedVectors,
-        Vector,
-        VectorLike,
-    )
+    from cluster_colors.type_hints import FPArray, ProximityMatrix, StackedVectors
 
 
 class AllClustersAreSingletonsError(Exception):

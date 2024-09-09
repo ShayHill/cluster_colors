@@ -15,8 +15,8 @@ starting point for kmedians.
 
 import numpy as np
 
-from cluster_colors.cluster_member import Members
-from cluster_colors.clusters import Cluster, Member
+from cluster_colors.cluster_member import Members, Member
+from cluster_colors.cluster_cluster import Cluster
 from cluster_colors.type_hints import StackedVectors
 
 
