@@ -16,7 +16,7 @@ class TestGetBiggestColor:
         quarter_colorspace_se = 16**2
         colors = image_colors.stack_image_colors(_TEST_IMAGE)
         clusters = Supercluster.from_stacked_vectors(colors)
-        clusters.set_state(2)
+        clusters.set_n(2)
 
         _ = clusters.set_min_proximity(quarter_colorspace_se)
         # breakpoint()

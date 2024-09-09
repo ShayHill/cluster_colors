@@ -34,11 +34,10 @@ class TestKMedians:
         """Test that the clusters are sorted by the number of colors in them"""
         clusters = Supercluster.from_stacked_vectors(colors)
         clusters.set_min_proximity(100/3)
-        _ = clusters.get_rsorted_clusters()
         _ = clusters.as_stacked_vectors
 
     def test_get_rsorted_exemplars(self, colors: ColorsArray):
         """Test that the clusters are sorted by the number of colors in them"""
         clusters = Supercluster.from_stacked_vectors(colors)
         clusters.set_min_proximity(100/3)
-        _ = clusters.get_rsorted_exemplars()
+        _ = clusters.as_vectors

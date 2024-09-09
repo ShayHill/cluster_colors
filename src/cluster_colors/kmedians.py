@@ -47,7 +47,7 @@ class KMedSupercluster(Supercluster):
         Overload this method to implement a custom split strategy or to add a
         convergence step after splitting.
         """
-        for cluster in tuple(self.next_to_split):
+        for cluster in tuple(self._next_to_split):
             self._split_cluster(cluster)
         self.converge()
         self._states.capture_state(self)
