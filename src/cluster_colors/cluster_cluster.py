@@ -6,8 +6,9 @@
 
 from __future__ import annotations
 
+
 import functools
-from typing import TYPE_CHECKING, Annotated, Literal, NamedTuple, TypeVar
+from typing import TYPE_CHECKING, Annotated, Literal, NamedTuple, TypeVar, Callable
 
 import numpy as np
 from basic_colormath import get_delta_e_lab, get_sqeuclidean, rgb_to_lab
@@ -27,6 +28,49 @@ if TYPE_CHECKING:
 
 
 _sn_gen = itertools.count()
+
+
+def _construct_is_low(low: float, high: float) -> Callable[[float], bool]:
+    """Return a function that determines if a value is closer to below than above.
+
+    :param low: exemplar of low values
+    :param hight: exemplar of high values
+    :return: function that determines if a value is closer to low than high
+    """
+
+    def is_low(value: float) -> bool:
+        """Determine if a value is closer to low than high.
+
+        :param value: float
+        :return: True if value is closer to low than high
+        """
+        return abs(value - low) < abs(value - high)
+
+    return is_low
+
+
+def _split_floats(floats: Iterable[float]) -> int:
+    """Find an index of a sorted list of floats that minimizes the sum of errors.
+
+    :param floats: An iterable of float numbers.
+    :return: An index of the list that minimizes the sum of errors.
+    """
+    floats = sorted(floats)
+    if len(floats) < 2:
+        msg = "Cannot split a list of floats with fewer than 2 elements"
+        raise ValueError(msg)
+    if len(floats) == 2:
+        return 1
+
+    def converge(splitter: int) -> int:
+        below, above = floats[:splitter], floats[splitter:]
+        is_low = _construct_is_low(sum(below) / len(below), sum(above) / len(above))
+        new_splitter = len(list(itertools.takewhile(is_low, floats)))
+        if new_splitter == splitter:
+            return splitter
+        return converge(new_splitter)
+
+    return converge(len(floats) // 2)
 
 
 def _cmp(a: float, b: float) -> Literal[-1, 0, 1]:
@@ -396,10 +440,19 @@ class Cluster:
         def rel_dist(x: int) -> float:
             return np.dot(abc, self.members.vectors[x])
 
-        sorted_along_dhv = sorted(self.ixs, key=rel_dist)
+        scored = sorted([(rel_dist(x), x) for x in self.ixs])
+        split = _split_floats([s for s, _ in scored])
+        if split in {0, len(scored)}:
+            split = len(scored) // 2
         return {
-            Cluster(self.members, sorted_along_dhv[: len(self.ixs) // 2]),
-            Cluster(self.members, sorted_along_dhv[len(self.ixs) // 2 :]),
+            Cluster(self.members, [x for _, x in scored[:split]]),
+            Cluster(self.members, [x for _, x in scored[split:]]),
+        }
+
+        sorted_along_ahv = sorted(self.ixs, key=rel_dist)
+        return {
+            Cluster(self.members, sorted_along_ahv[: len(self.ixs) // 2]),
+            Cluster(self.members, sorted_along_ahv[len(self.ixs) // 2 :]),
         }
 
     def se(self, member_candidate: Member) -> float:

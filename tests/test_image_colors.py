@@ -4,6 +4,7 @@ from cluster_colors import image_colors
 from cluster_colors.paths import TEST_DIR
 from cluster_colors.kmedians import KMedSupercluster
 from cluster_colors.clusters import Supercluster
+from basic_colormath import get_delta_e_matrix
 import numpy as np
 
 _TEST_IMAGE = TEST_DIR / 'sugar-shack-barnes.jpg'
@@ -15,7 +16,9 @@ class TestGetBiggestColor:
         quarter_colorspace_se = 16**2
         colors = image_colors.stack_image_colors(_TEST_IMAGE)
         clusters = Supercluster.from_stacked_vectors(colors)
+        clusters.set_state(2)
 
-        _ = clusters.split_to_intercluster_proximity(np.inf)
+        _ = clusters.set_min_proximity(quarter_colorspace_se)
+        # breakpoint()
         # TODO: restore show_clusters
         # image_colors.show_clusters(clusters, "sugar-shack-barnes")

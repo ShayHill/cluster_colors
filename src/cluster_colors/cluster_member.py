@@ -85,6 +85,18 @@ class Members:
         weight_columns = np.tile(self.weights, (len(self.weights), 1))
         return self.pmatrix * weight_columns
 
+    @functools.cached_property
+    def pmatrix_with_inf_diagonal(self) -> ProximityMatrix:
+        """Proximity matrix with infinity on the diagonal.
+
+        :return: proximity matrix with infinity on the diagonal. The is useful for
+            finding the minumum proximity between members that is *not* the distance
+            between a member and itself.
+        """
+        pmatrix_copy = self.pmatrix.copy()
+        np.fill_diagonal(pmatrix_copy, np.inf)
+        return pmatrix_copy
+
     @classmethod
     def from_stacked_vectors(
         cls, stacked_vectors: StackedVectors, *, pmatrix: FPArray | None = None

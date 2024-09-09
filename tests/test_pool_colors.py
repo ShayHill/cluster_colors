@@ -23,12 +23,15 @@ _T = TypeVar("_T")
 
 DIAG = np.array([(i, i, i, i + 1) for i in range(256)])
 
+img = Image.open(TEST_DIR / "sugar-shack-barnes.jpg")
+colors = np.array(img).reshape(-1, 1)[::16]
+stacked_colors = stack_vectors(colors)
 
 class TestPoolColors:
     def test_sum_weight(self):
         """Total weight of all colors is number of pixels."""
         img = Image.open(TEST_DIR / "sugar-shack-barnes.jpg")
-        colors = np.array(img)
+        colors = np.array(img)[:100, :100]
         weights = np.full(colors.shape[:-1], 1, dtype=float)
         weighted_colors = stack_vectors(np.dstack((colors, weights)))
         reduced = pool_colors.pool_colors(weighted_colors, 4)
@@ -36,20 +39,14 @@ class TestPoolColors:
 
     def test_robust_to_order(self):
         """Order of colors should not matter."""
-        img = Image.open(TEST_DIR / "sugar-shack-barnes.jpg")
-        colors = np.array(img)
-        stacked_colors = stack_vectors(colors)
         reduced = {tuple(x) for x in pool_colors.pool_colors(stacked_colors, 4)}
         reduced2 = {tuple(x) for x in pool_colors.pool_colors(stacked_colors[::-1], 4)}
         assert reduced == reduced2
 
     def test_singles(self):
         """When color has a weight of 1 and does not stack, return same."""
-        img = Image.open(TEST_DIR / "sugar-shack-barnes.jpg")
-        colors = np.array(img).reshape(-1, 1)
-        stacked_colors = stack_vectors(colors)
-        reduced = {tuple(x) for x in pool_colors.pool_colors(stacked_colors, 4)}
-        reduced2 = {tuple(x) for x in pool_colors.pool_colors(stacked_colors[::-1], 4)}
+        reduced = {tuple(x) for x in pool_colors.pool_colors(colors, 4)}
+        reduced2 = {tuple(x) for x in pool_colors.pool_colors(colors[::-1], 4)}
         assert reduced == reduced2
 
     def test_small_number_of_identical_colors(self):

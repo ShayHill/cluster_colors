@@ -11,7 +11,7 @@ import bisect
 import functools
 import itertools as it
 from contextlib import suppress
-from typing import TYPE_CHECKING, Annotated, Literal, NamedTuple, TypeVar, cast
+from typing import TYPE_CHECKING, Annotated, Literal, NamedTuple, TypeVar, cast, Callable
 
 import numpy as np
 from basic_colormath import get_delta_e_lab, get_sqeuclidean, rgb_to_lab
@@ -308,16 +308,37 @@ class Supercluster:
 
     def get_min_intercluster_proximity(self) -> float:
         """Return the minimum span between clusters."""
+        if len(self.clusters) == 1:
+            return 0
         ixs = [c.exemplar for c in self.clusters]
-        return float(np.min(self.members.weighted_pmatrix[np.ix_(ixs, ixs)]))
+        pmat = self.members.pmatrix_with_inf_diagonal
+        return float(np.min(pmat[np.ix_(ixs, ixs)]))
 
-    def split_to_intercluster_proximity(self, min_proximity: float):
-        """Split until the minimum intercluster proximity is at least min_proximity."""
-        while self.get_min_intercluster_proximity() < min_proximity:
+    def split_while(self, predicate: Callable[[Supercluster], bool]) -> None:
+        """Split clusters until a predicate is False.
+
+        :param predicate: function that takes a Supercluster instance and returns a
+            boolean
+        """
+        if not predicate(self):
+            self.set_state(1)
+        while predicate(self):
             try:
                 self.split_next_cluster()
             except AllClustersAreSingletonsError:
-                break
+                return
+        self.set_state(len(self.clusters) - 1)
+
+    def set_min_proximity(self, min_proximity: float):
+        """Split as far as possible while maintaining a minimum inter-cluster span.
+
+        Split until the condition is broken, then back up one step. If the condition
+        is broken at the start, back up all the way to a 1-cluster state before
+        splitting.
+        """
+        def predicate(supercluster: Supercluster) -> bool:
+            return supercluster.get_min_intercluster_proximity() > min_proximity
+        return self.split_while(predicate)
 
     def _restore_state_to_at_most_n(self, n: int) -> None:
         n = min(len(self._states), n)
