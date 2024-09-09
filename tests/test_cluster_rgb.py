@@ -12,10 +12,9 @@ from matplotlib import pyplot as plt
 
 # pyright: reportPrivateUsage=false
 import cluster_colors.clusters
-from cluster_colors.cluster_member import Member, Members
+from cluster_colors.cluster_member import Members
 from cluster_colors.clusters import Cluster
 from cluster_colors.vector_stacker import  stack_vectors
-from basic_colormath import rgb_to_lab, get_delta_e_matrix
 
 
 
@@ -27,36 +26,36 @@ def thin_cluster() -> Cluster:
     return Cluster(members)
 
 
-class TestMemberNewMembers:
-    """Test Member.new_members."""
+# class TestMemberNewMembers:
+#     """Test Member.new_members."""
 
-    def test_one_member_per_color(self) -> None:
-        """Return 256 members given 256 colors."""
-        colors = stack_vectors(np.random.randint(1, 256, (256, 4), dtype=np.uint8))
-        members = Member.new_members(colors)
-        assert len(members) == len(colors)
+#     def test_one_member_per_color(self) -> None:
+#         """Return 256 members given 256 colors."""
+#         colors = stack_vectors(np.random.randint(1, 256, (256, 4), dtype=np.uint8))
+#         members = Member.new_members(colors)
+#         assert len(members) == len(colors)
 
-    def test_member_vs(self) -> None:
-        """Return the (r, g, b) values of the member."""
-        member = Member(np.array([1, 2, 3, 4]))
-        assert (member.vs == (1, 2, 3)).all()
+#     def test_member_vs(self) -> None:
+#         """Return the (r, g, b) values of the member."""
+#         member = Member(np.array([1, 2, 3, 4]))
+#         assert (member.vs == (1, 2, 3)).all()
 
-    def test_member_w(self) -> None:
-        """Return the weight of the member."""
-        member = Member(np.array([1, 2, 3, 4]))
-        assert member.w == 4
+#     def test_member_w(self) -> None:
+#         """Return the weight of the member."""
+#         member = Member(np.array([1, 2, 3, 4]))
+#         assert member.w == 4
 
-    def test_member_rgb_floats(self) -> None:
-        member = Member(np.array([1, 2, 3.3, 4]))
-        assert member.rgb_floats == (1, 2, 3.3)
+#     def test_member_rgb_floats(self) -> None:
+#         member = Member(np.array([1, 2, 3.3, 4]))
+#         assert member.rgb_floats == (1, 2, 3.3)
 
-    def test_member_rgb(self) -> None:
-        member = Member(np.array([1, 2, 3.3, 4]))
-        assert member.rgb == (1, 2, 3)
+#     def test_member_rgb(self) -> None:
+#         member = Member(np.array([1, 2, 3.3, 4]))
+#         assert member.rgb == (1, 2, 3)
 
-    def test_member_lab(self) -> None:
-        member = Member(np.array([1, 2, 3.3, 4]))
-        assert member.lab == rgb_to_lab((1, 2, 3))
+#     def test_member_lab(self) -> None:
+#         member = Member(np.array([1, 2, 3.3, 4]))
+#         assert member.lab == rgb_to_lab((1, 2, 3))
 
 
 

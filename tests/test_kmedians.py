@@ -16,7 +16,6 @@ import numpy as np
 import numpy.typing as npt
 import pytest
 
-from cluster_colors.kmedians import KMedSupercluster
 from cluster_colors.vector_stacker import stack_vectors
 from cluster_colors.clusters import Supercluster
 

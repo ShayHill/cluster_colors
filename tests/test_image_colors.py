@@ -2,10 +2,7 @@
 
 from cluster_colors import image_colors
 from cluster_colors.paths import TEST_DIR
-from cluster_colors.kmedians import KMedSupercluster
 from cluster_colors.clusters import Supercluster
-from basic_colormath import get_delta_e_matrix
-import numpy as np
 
 _TEST_IMAGE = TEST_DIR / 'sugar-shack-barnes.jpg'
 

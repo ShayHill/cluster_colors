@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from contextlib import suppress
-from typing import TYPE_CHECKING, Callable, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
 from paragraphs import par
@@ -18,7 +18,7 @@ from cluster_colors.cluster_member import Members
 _RGB = tuple[float, float, float]
 
 if TYPE_CHECKING:
-    pass
+    from collections.abc import Callable
 
     from cluster_colors.type_hints import FPArray, ProximityMatrix, StackedVectors
 
@@ -26,10 +26,10 @@ if TYPE_CHECKING:
 class AllClustersAreSingletonsError(Exception):
     """Exception raised when no clusters can be split."""
 
-    def __init__(
-        self, message: str = "Cannot split any cluster. All clusters are singletons."
-    ) -> None:
-        self.message = message
+    def __init__(self, message: str | None = None) -> None:
+        """Create a new AllClustersAreSingletonsError instance."""
+        message_ = message or "Cannot split any cluster. All clusters are singletons."
+        self.message = message_
         super().__init__(self.message)
 
 
@@ -120,7 +120,6 @@ class Supercluster:
         elif self.cached_n < self.n:
             msg = "Previous state not cached."
             raise ValueError(msg)
-
 
     def get_min_intercluster_proximity(self) -> float:
         """Return the minimum span between clusters."""
@@ -220,7 +219,7 @@ class Supercluster:
         """
         candidate = max(self.clusters, key=lambda c: c.error_metric)
         if candidate.error == 0:
-            raise AllClustersAreSingletonsError()
+            raise AllClustersAreSingletonsError
         return candidate
 
     def split_next_cluster(self):

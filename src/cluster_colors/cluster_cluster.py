@@ -8,15 +8,14 @@ from __future__ import annotations
 
 import functools
 import itertools
-from typing import TYPE_CHECKING, Annotated, Callable, Literal
+from typing import TYPE_CHECKING, Annotated
 
 import numpy as np
-from stacked_quantile import get_stacked_medians
 
-from cluster_colors.cluster_member import Member, Members
+from cluster_colors.cluster_member import Members
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Callable, Iterable
 
     from cluster_colors.type_hints import FPArray, StackedVectors, Vector
 
@@ -117,23 +116,6 @@ class Cluster:
         members = Members.from_stacked_vectors(stacked_vectors)
         return cls(members)
 
-    def __iter__(self) -> Iterator[Member]:
-        """Iterate over members.
-
-        :return: None
-        :yield: Members
-        """
-        return iter(self.members)
-
-    @functools.cached_property
-    def as_member(self) -> Member:
-        """Get cluster as a Member instance.
-
-        :return: Member instance with median rgb and sum weight of cluster members
-        """
-        medians = get_stacked_medians(self._vss, self._ws)
-        return Member(np.array([*medians, np.sum(self._ws)]))
-
     # ===========================================================================
     #   Vector-like properties
     # ===========================================================================
@@ -153,10 +135,10 @@ class Cluster:
             manually passing this, but it's here to break ties in property medoid.
         :return: index of the mediod, respecting weights
         """
-        ixs = self.ixs if ixs is None else np.array(list(ixs), dtype=np.int32)
-        if len(ixs) == 1:
-            return int(ixs[0])
-        return int(ixs[np.argmin(self.members.weighted_pmatrix[ixs].sum(axis=1))])
+        ixs_ = self.ixs if ixs is None else np.array(list(ixs), dtype=np.int32)
+        if len(ixs_) == 1:
+            return int(ixs_[0])
+        return int(ixs_[np.argmin(self.members.weighted_pmatrix[ixs_].sum(axis=1))])
 
     @functools.cached_property
     def exemplar(self) -> int:
@@ -189,8 +171,7 @@ class Cluster:
 
         if len(arg_where_min) == 1:
             return int(self.ixs[arg_where_min[0]])
-        else:
-            return self._get_medoid_respecting_weights(arg_where_min)
+        return self._get_medoid_respecting_weights(arg_where_min)
 
     @property
     def as_vector(self) -> Vector:

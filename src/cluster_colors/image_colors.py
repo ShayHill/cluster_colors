@@ -17,7 +17,7 @@ from PIL import Image
 
 from cluster_colors.config import CACHE_DIR
 from cluster_colors.cut_colors import cut_colors
-from cluster_colors.kmedians import KMedSupercluster
+from cluster_colors.clusters import Supercluster
 from cluster_colors.paths import BINARIES_DIR
 from cluster_colors.pool_colors import pool_colors
 from cluster_colors.vector_stacker import stack_vectors
@@ -87,9 +87,9 @@ def get_biggest_color(stacked_colors: StackedVectors) -> tuple[float, ...]:
     Cluster into large clusters, then return the exemplar of the biggest cluster.
     """
     quarter_colorspace_se = 64**2
-    clusters = KMedSupercluster.from_stacked_vectors(stacked_colors)
-    clusters.split_to_delta_e(quarter_colorspace_se)
-    return clusters.get_rsorted_exemplars()[0]
+    clusters = Supercluster.from_stacked_vectors(stacked_colors)
+    clusters.set_min_proximity(quarter_colorspace_se)
+    return clusters.as_vectors[0]
 
 
 def get_image_clusters(
@@ -98,7 +98,7 @@ def get_image_clusters(
     pool_bits: NBits = 6,
     *,
     ignore_cache: bool = False,
-) -> KMedSupercluster:
+) -> Supercluster:
     """Get all colors in an image as a single KMedSupercluster instance.
 
     :param filename: the path to an image file
@@ -113,10 +113,10 @@ def get_image_clusters(
     stacked_colors = stack_image_colors(
         filename, num_colors, pool_bits, ignore_cache=ignore_cache
     )
-    return KMedSupercluster.from_stacked_vectors(stacked_colors)
+    return Supercluster.from_stacked_vectors(stacked_colors)
 
 
-def show_clusters(supercluster: KMedSupercluster, filename_stem: str) -> None:
+def show_clusters(supercluster: Supercluster, filename_stem: str) -> None:
     """Create a png with the exemplar of each cluster.
 
     :param supercluster: the clusters to show
