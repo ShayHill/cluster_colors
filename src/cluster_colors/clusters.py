@@ -101,6 +101,22 @@ class _Supercluster(ABC):
     # ===========================================================================
 
     @classmethod
+    def from_vectors(
+        cls: type[_SuperclusterT],
+        vectors: Vectors,
+        pmatrix: ProximityMatrix | None = None,
+    ) -> _SuperclusterT:
+        """Create a new Supercluster instance from stacked vectors.
+
+        :param stacked_vectors: members as a numpy array (n, m+1) with the last
+            column as the weight.
+        :param pmatrix: optional proximity matrix. If not given, will be calculated
+            with squared Euclidean distance
+        """
+        members = Members.from_vectors(vectors, pmatrix=pmatrix)
+        return cls(members)
+
+    @classmethod
     def from_stacked_vectors(
         cls: type[_SuperclusterT],
         stacked_vectors: Vectors,
@@ -110,8 +126,8 @@ class _Supercluster(ABC):
 
         :param stacked_vectors: members as a numpy array (n, m+1) with the last
             column as the weight.
-        :param pmatrix: proximity matrix (will use squared Euclidean distance if not
-            given).
+        :param pmatrix: optional proximity matrix. If not given, will be calculated
+            with squared Euclidean distance
         """
         members = Members.from_stacked_vectors(stacked_vectors, pmatrix=pmatrix)
         return cls(members)
@@ -238,7 +254,7 @@ class _Supercluster(ABC):
         lowest sse.
         """
         pairs = it.combinations(self.clusters, 2)
-        return min(pairs, key=lambda p: p[0].get_merge_error(p[1]))
+        return min(pairs, key=lambda p: p[0].get_merge_error_metric(p[1]))
 
     # ===========================================================================
     #   perform splits and merges

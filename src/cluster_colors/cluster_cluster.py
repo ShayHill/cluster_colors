@@ -18,7 +18,7 @@ from cluster_colors.cluster_member import Members
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
-    from cluster_colors.type_hints import FPArray, Vector, Vectors
+    from cluster_colors.type_hints import FPArray, ProximityMatrix, Vector, Vectors
 
 
 _sn_gen = itertools.count()
@@ -96,22 +96,42 @@ class Cluster:
             self.ixs = np.arange(len(self.members), dtype=np.int32)
         else:
             self.ixs = np.array(sorted(ixs), dtype=np.int32)
-        self._sn = next(_sn_gen)
+        self.sn = next(_sn_gen)
 
     # ===========================================================================
     #   constructors
     # ===========================================================================
 
     @classmethod
-    def from_stacked_vectors(cls, stacked_vectors: Vectors) -> Cluster:
+    def from_vectors(
+        cls, vectors: Vectors, pmatrix: ProximityMatrix | None = None
+    ) -> Cluster:
         """Create a Cluster instance from an iterable of colors.
 
         :param stacked_vectors: An iterable of vectors with a weight axis
             [(r0, g0, b0, w0), (r1, g1, b1, w1), ...]
+        :param pmatrix: optional proximity matrix. If not given, will be calculated
+            with squared Euclidean distance
         :return: A Cluster instance with members
             {Member([r0, g0, b0, w0]), Member([r1, g1, b1, w1]), ...}
         """
-        members = Members.from_stacked_vectors(stacked_vectors)
+        members = Members.from_vectors(vectors, pmatrix=pmatrix)
+        return cls(members)
+
+    @classmethod
+    def from_stacked_vectors(
+        cls, stacked_vectors: Vectors, pmatrix: ProximityMatrix | None = None
+    ) -> Cluster:
+        """Create a Cluster instance from an iterable of colors.
+
+        :param stacked_vectors: An iterable of vectors with a weight axis
+        :param pmatrix: optional proximity matrix. If not given, will be calculated
+            with squared Euclidean distance
+            [(r0, g0, b0, w0), (r1, g1, b1, w1), ...]
+        :return: A Cluster instance with members
+            {Member([r0, g0, b0, w0]), Member([r1, g1, b1, w1]), ...}
+        """
+        members = Members.from_stacked_vectors(stacked_vectors, pmatrix=pmatrix)
         return cls(members)
 
     # ===========================================================================
@@ -249,12 +269,12 @@ class Cluster:
     def error_metric(self) -> tuple[float, int]:
         """Break ties in the error property.
 
-        :return: the error and negative _sn so older cluster will split in case of a
+        :return: the error and negative sn so older cluster will split in case of a
             tie.
 
         Ties aren't likely, but just to keep everything deterministic.
         """
-        return self.error, -self._sn
+        return self.error, -self.sn
 
     def get_merge_error(self, other: Cluster) -> float:
         """Get the complete linkage error of merging this cluster with another.
@@ -262,6 +282,16 @@ class Cluster:
         :return: sum of squared errors of all members if merged with another cluster
         """
         return float(np.max(self.members.pmatrix[np.ix_(self.ixs, other.ixs)]))
+
+    def get_merge_error_metric(self, other: Cluster) -> tuple[float, int]:
+        """Break ties in the get_merge_error property.
+
+        :return: the error and negative of max sn so older cluster will merge in
+            case of a tie.
+
+        Ties aren't likely, but just to keep everything deterministic.
+        """
+        return self.get_merge_error(other), -max(self.sn, other.sn)
 
     def split(self) -> Annotated[set[Cluster], "doubleton"]:
         """Split cluster into two clusters.

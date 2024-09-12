@@ -23,11 +23,7 @@ if TYPE_CHECKING:
 
 
 class Members:
-    """A list of cluster members with a proximity matrix.
-
-    :param members: list of members
-    :param f_proximity: function that returns a proximity matrix
-    """
+    """A list of cluster members with a proximity matrix."""
 
     def __init__(
         self,
