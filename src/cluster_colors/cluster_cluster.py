@@ -53,10 +53,10 @@ def _split_floats(floats: Iterable[float]) -> int:
     if len(floats) < 2:
         msg = "Cannot split a list of floats with fewer than 2 elements"
         raise ValueError(msg)
-    if len(floats) == 2:
-        return 1
 
     def converge(splitter: int) -> int:
+        if splitter == 0:  # all floats are identical
+            return 0
         below, above = floats[:splitter], floats[splitter:]
         is_low = _construct_is_low(sum(below) / len(below), sum(above) / len(above))
         new_splitter = len(list(itertools.takewhile(is_low, floats)))
@@ -309,21 +309,16 @@ class Cluster:
         See stacked_quantile module for details, but that case is covered here.
         """
         abc = self._direction_of_highest_variance
+        vecs = self.members.vectors
 
         def rel_dist(x: int) -> float:
             return np.dot(abc, self.members.vectors[x])
 
-        scored = sorted([(rel_dist(x), x) for x in self.ixs])
-        split = _split_floats([s for s, _ in scored])
+        scored = sorted([(rel_dist(x), tuple(vecs[x]), x) for x in self.ixs])
+        split = _split_floats([s for s, *_ in scored])
         if split in {0, len(scored)}:
             split = len(scored) // 2
         return {
-            Cluster(self.members, [x for _, x in scored[:split]]),
-            Cluster(self.members, [x for _, x in scored[split:]]),
-        }
-
-        sorted_along_ahv = sorted(self.ixs, key=rel_dist)
-        return {
-            Cluster(self.members, sorted_along_ahv[: len(self.ixs) // 2]),
-            Cluster(self.members, sorted_along_ahv[len(self.ixs) // 2 :]),
+            Cluster(self.members, [x for *_, x in scored[:split]]),
+            Cluster(self.members, [x for *_, x in scored[split:]]),
         }
