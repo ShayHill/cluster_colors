@@ -62,19 +62,26 @@ def thin_cluster() -> Cluster:
 class TestClusterExemplar:
     """Test triangulate_image._Cluster.exemplar property"""
 
-    def test_exemplar(self) -> None:
+    def test_weighted_medoid(self) -> None:
         """Return weighted average of member.rgb values."""
         vectors = np.array([[1, 2, 3, 1], [4, 5, 6, 2], [7, 8, 9, 3]])
         members = Members.from_stacked_vectors(vectors)
         cluster = Cluster(members, [0, 2])
-        np.testing.assert_array_equal(cluster.exemplar, 2)
+        np.testing.assert_array_equal(cluster.weighted_medoid, 2)
 
-    def test_medoid(self) -> None:
+    def test_unweighted_medoid(self) -> None:
         """Return the member with lowest cost, ignoring weights."""
         vectors = np.array([[1, 2, 3, 1], [4, 5, 6, 2], [7, 8, 9, 3]])
         members = Members.from_stacked_vectors(vectors)
         cluster = Cluster(members, [0, 1, 2])
-        np.testing.assert_array_equal(cluster.medoid, 1)
+        np.testing.assert_array_equal(cluster.unweighted_medoid, 1)
+
+    def test_weighted_median(self) -> None:
+        """Return the weighted median of the members."""
+        vectors = np.array([[1, 2, 3, 1], [4, 5, 6, 2], [7, 8, 9, 3]])
+        members = Members.from_stacked_vectors(vectors)
+        cluster = Cluster(members, [0, 1, 2])
+        np.testing.assert_array_equal(cluster.weighted_median, (5.5, 6.5, 7.5))
 
 
 class TestCluster:
@@ -95,10 +102,10 @@ def show_clusters(clusters: Iterable[Cluster]) -> None:
 
     Make each cluster a different color.
     """
-    colors = plt.cm.rainbow(np.linspace(0, 1, len(clusters)))  # type: ignore
+    colors = plt.cm.rainbow(np.linspace(0, 1, len(clusters.clusters)))  # type: ignore
     colors = stack_vectors(colors)  # type: ignore
     for cluster, color in zip(clusters, colors):
-        points = cluster._vss
+        points = cluster.members.vectors
         xs = [x for x, _ in points]
         ys = [y for _, y in points]
         plt.scatter(xs, ys, color=color)  # type: ignore

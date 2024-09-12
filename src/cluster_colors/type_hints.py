@@ -23,8 +23,11 @@ Vector: TypeAlias = Annotated[FPArray, (-1,)]
 # something that can be cast to a vector
 VectorLike: TypeAlias = Sequence[float] | Vector
 
-# an array of vectors, expected to have a weight axis
-StackedVectors: TypeAlias = Annotated[npt.NDArray[np.float64], (-1, -1)]
+# an array of vectors, (x, ...) or (x, ..., w)
+Vectors: TypeAlias = Annotated[npt.NDArray[np.float64], (-1, -1)]
+# something that can be cast to vectors
+VectorsLike: TypeAlias = Sequence[Sequence[float]] | Vectors
+
 
 ProximityMatrix: TypeAlias = Annotated[FPArray, "(n, n)"]
 

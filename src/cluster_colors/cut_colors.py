@@ -16,7 +16,7 @@ starting point for kmedians.
 import numpy as np
 
 from cluster_colors.cluster_cluster import Cluster
-from cluster_colors.type_hints import StackedVectors
+from cluster_colors.type_hints import Vectors
 
 
 def _split_every_cluster(clusters: set[Cluster]) -> set[Cluster]:
@@ -28,7 +28,7 @@ def _split_every_cluster(clusters: set[Cluster]) -> set[Cluster]:
     Recursively split every cluster with no regard for error. Will only *not* split
     a cluster if it only has one member.
     """
-    splittable = {c for c in clusters if len(c) > 1}
+    splittable = {c for c in clusters if len(c.ixs) > 1}
     if not splittable:
         return clusters
     for cluster in splittable:
@@ -54,7 +54,7 @@ def _split_largest_cluster(clusters: set[Cluster], num: int) -> set[Cluster]:
     return clusters
 
 
-def cut_colors(colors: StackedVectors, num: int) -> StackedVectors:
+def cut_colors(colors: Vectors, num: int) -> Vectors:
     """Merge colors into a set of num colors.
 
     :param colors: a (-1, 4) array of unique rgb values with weights

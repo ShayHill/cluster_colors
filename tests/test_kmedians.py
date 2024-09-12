@@ -1,4 +1,4 @@
-"""Test methods in KMedSupercluster
+"""Test methods in KMedDivisiveSupercluster
 
 :author: Shay Hill
 :created: 2023-03-14
@@ -17,7 +17,7 @@ import numpy.typing as npt
 import pytest
 
 from cluster_colors.vector_stacker import stack_vectors
-from cluster_colors.clusters import Supercluster
+from cluster_colors.clusters import DivisiveSupercluster
 
 ColorsArray = Annotated[npt.NDArray[np.float_], (-1, 3)]
 
@@ -31,12 +31,12 @@ def colors(request) -> ColorsArray:
 class TestKMedians:
     def test_get_rsorted_clusters(self, colors: ColorsArray):
         """Test that the clusters are sorted by the number of colors in them"""
-        clusters = Supercluster.from_stacked_vectors(colors)
+        clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_min_proximity(100/3)
         _ = clusters.as_stacked_vectors
 
     def test_get_rsorted_exemplars(self, colors: ColorsArray):
         """Test that the clusters are sorted by the number of colors in them"""
-        clusters = Supercluster.from_stacked_vectors(colors)
+        clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_min_proximity(100/3)
         _ = clusters.as_vectors

@@ -122,6 +122,7 @@ repos:
   # D400 First line should end with a period
   # D401 First line should be in imperative mood
   # PYI019 Method should used typing.Self instead of TypeVar (incompatible with Python 3.10)
+  # PLR2004 Magic numbers
   #
   rev: 'v0.6.3'
   hooks:
@@ -130,7 +131,7 @@ repos:
       args:
       - --target-version=py310
       - --select=ALL
-      - --ignore=COM812,D203,D213,ISC003,ANN101,ANN102,ANN201,ANN202,D400,D401,PYI019
+      - --ignore=COM812,D203,D213,ISC003,ANN101,ANN102,ANN201,ANN202,D400,D401,PYI019,PLR2004
       # - --fix
 
 # reads pyproject.toml for additional config

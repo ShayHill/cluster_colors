@@ -30,7 +30,7 @@ from typing import Any
 import numpy as np
 from numpy import typing as npt
 
-from cluster_colors.type_hints import FPArray, StackedVectors
+from cluster_colors.type_hints import FPArray, Vectors
 
 
 def add_weight_axis(
@@ -60,7 +60,7 @@ def add_weight_axis(
 
 def stack_vectors(
     vectors: npt.NDArray[np.number[Any]], weight: float | None = None
-) -> StackedVectors:
+) -> Vectors:
     """Find and count unique vectors.
 
     :param vectors: array of numbers, with shape (..., n)

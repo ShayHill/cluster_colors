@@ -19,7 +19,7 @@ from basic_colormath import get_sqeuclidean_matrix
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from cluster_colors.type_hints import FPArray, ProximityMatrix, StackedVectors
+    from cluster_colors.type_hints import FPArray, ProximityMatrix, Vectors, VectorsLike
 
 
 class Members:
@@ -31,7 +31,7 @@ class Members:
 
     def __init__(
         self,
-        vectors: Iterable[Iterable[float]],
+        vectors: VectorsLike,
         *,
         weights: Iterable[float] | None = None,
         pmatrix: ProximityMatrix | None = None,
@@ -46,7 +46,7 @@ class Members:
         self.vectors = np.array(list(map(list, vectors))).astype(float)
 
         if weights is None:
-            self.weights = np.ones(len(self))
+            self.weights = np.ones(len(self.vectors))
         else:
             self.weights = np.array(list(weights))
         if pmatrix is None:
@@ -83,14 +83,33 @@ class Members:
         np.fill_diagonal(pmatrix_copy, np.inf)
         return pmatrix_copy
 
+    # ===========================================================================
+    #   constructors
+    # ===========================================================================
+
+    @classmethod
+    def from_vectors(
+        cls, vectors: Vectors, *, pmatrix: FPArray | None = None
+    ) -> Members:
+        """Create a Members instance from stacked_vectors.
+
+        :param vectors: (n, m) a list of vectors
+        :param pmatrix: optional proximity matrix. If not given, will be calculated
+            with squared Euclidean distance
+        :return: Members instance
+        """
+        return cls(vectors, weights=(1 for _ in vectors), pmatrix=pmatrix)
+
     @classmethod
     def from_stacked_vectors(
-        cls, stacked_vectors: StackedVectors, *, pmatrix: FPArray | None = None
+        cls, stacked_vectors: Vectors, *, pmatrix: FPArray | None = None
     ) -> Members:
         """Create a Members instance from stacked_vectors.
 
         :param stacked_vectors: (n, m + 1) a list of vectors with weight channels in
             the last axis
+        :param pmatrix: optional proximity matrix. If not given, will be calculated
+            with squared Euclidean distance
         :return: Members instance
         """
         return cls(

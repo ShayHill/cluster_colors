@@ -11,13 +11,14 @@ import itertools
 from typing import TYPE_CHECKING, Annotated
 
 import numpy as np
+from stacked_quantile import get_stacked_medians
 
 from cluster_colors.cluster_member import Members
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
-    from cluster_colors.type_hints import FPArray, StackedVectors, Vector
+    from cluster_colors.type_hints import FPArray, Vector, Vectors
 
 
 _sn_gen = itertools.count()
@@ -97,15 +98,12 @@ class Cluster:
             self.ixs = np.array(sorted(ixs), dtype=np.int32)
         self._sn = next(_sn_gen)
 
-    def __len__(self) -> int:
-        """Get the number of members in the cluster.
-
-        :return: number of members in the cluster
-        """
-        return len(self.ixs)
+    # ===========================================================================
+    #   constructors
+    # ===========================================================================
 
     @classmethod
-    def from_stacked_vectors(cls, stacked_vectors: StackedVectors) -> Cluster:
+    def from_stacked_vectors(cls, stacked_vectors: Vectors) -> Cluster:
         """Create a Cluster instance from an iterable of colors.
 
         :param stacked_vectors: An iterable of vectors with a weight axis
@@ -121,14 +119,18 @@ class Cluster:
     # ===========================================================================
 
     @property
-    def w(self) -> float:
+    def weight(self) -> float:
         """Total weight of members.
 
         :return: total weight of members
         """
         return sum(self.members.weights[self.ixs])
 
-    def _get_medoid_respecting_weights(self, ixs: Iterable[int] | None = None) -> int:
+    # ===========================================================================
+    #   Cluster centers
+    # ===========================================================================
+
+    def _get_weighted_medoid(self, ixs: Iterable[int] | None = None) -> int:
         """Get the index of the mediod, respecting weights.
 
         :param ixs: optional subset of members indices. I can't see a use case for
@@ -141,7 +143,7 @@ class Cluster:
         return int(ixs_[np.argmin(self.members.weighted_pmatrix[ixs_].sum(axis=1))])
 
     @functools.cached_property
-    def exemplar(self) -> int:
+    def weighted_medoid(self) -> int:
         """Get cluster exemplar.
 
         :return: the index of the exemplar with the least cost
@@ -150,10 +152,10 @@ class Cluster:
         but this value acts as the exemplar when clustering, so I prefer to use this
         alias in my clustering code.
         """
-        return self._get_medoid_respecting_weights()
+        return self._get_weighted_medoid()
 
     @functools.cached_property
-    def medoid(self) -> int:
+    def unweighted_medoid(self) -> int:
         """Get the index of the mediod, mostly ignoring weights.
 
         :return: index of the mediod
@@ -163,7 +165,7 @@ class Cluster:
         with more members. That won't happen, but it's cheap to cover the case.
         """
         if len(self.ixs) < 3:
-            return self._get_medoid_respecting_weights()
+            return self._get_weighted_medoid()
 
         row_sums = self.members.pmatrix[self.ixs].sum(axis=1)
         min_cost = np.min(row_sums)
@@ -171,7 +173,20 @@ class Cluster:
 
         if len(arg_where_min) == 1:
             return int(self.ixs[arg_where_min[0]])
-        return self._get_medoid_respecting_weights(arg_where_min)
+        return self._get_weighted_medoid(arg_where_min)
+
+    @functools.cached_property
+    def weighted_median(self) -> Vector:
+        """Get the median of the cluster, respecting weights.
+
+        :return: median of the cluster
+
+        This is categorically different than the medoid, because the median is not a
+        member of the cluster. So this property is not an index to the cluster
+        members, but a vector is likely not coincident with any member.
+        """
+        weights = self.members.weights[self.ixs].reshape(-1, 1)
+        return get_stacked_medians(self.members.vectors[self.ixs], weights)
 
     @property
     def as_vector(self) -> Vector:
@@ -179,15 +194,7 @@ class Cluster:
 
         :return: exemplar as a vector
         """
-        return self.members.vectors[self.exemplar]
-
-    @property
-    def as_vectors(self) -> FPArray:
-        """Get the members as a 2D array.
-
-        :return: members as a 2D array
-        """
-        return self.members.vectors[self.ixs]
+        return self.members.vectors[self.weighted_medoid]
 
     @property
     def as_stacked_vector(self) -> Vector:
@@ -195,17 +202,8 @@ class Cluster:
 
         :return: exemplar as a stacked vector
         """
-        weight = self.members.weights[self.exemplar]
+        weight = self.members.weights[self.weighted_medoid]
         return np.append(self.as_vector, weight)
-
-    @property
-    def as_stacked_vectors(self) -> FPArray:
-        """Get the members as a 2D array with weights.
-
-        :return: members as a 2D array with weights
-        """
-        weights = self.members.weights[self.ixs].reshape(-1, 1)
-        return np.hstack([self.as_vectors, weights])
 
     @property
     def covariance_matrix(self) -> FPArray:
@@ -243,9 +241,9 @@ class Cluster:
 
         :return: sum of squared errors of all members
         """
-        if len(self) == 1:
+        if len(self.ixs) == 1:
             return 0
-        return float(np.sum(self.members.weighted_pmatrix[self.exemplar]))
+        return float(np.sum(self.members.weighted_pmatrix[self.weighted_medoid]))
 
     @property
     def error_metric(self) -> tuple[float, int]:
@@ -257,6 +255,13 @@ class Cluster:
         Ties aren't likely, but just to keep everything deterministic.
         """
         return self.error, -self._sn
+
+    def get_merge_error(self, other: Cluster) -> float:
+        """Get the complete linkage error of merging this cluster with another.
+
+        :return: sum of squared errors of all members if merged with another cluster
+        """
+        return float(np.max(self.members.pmatrix[np.ix_(self.ixs, other.ixs)]))
 
     def split(self) -> Annotated[set[Cluster], "doubleton"]:
         """Split cluster into two clusters.
