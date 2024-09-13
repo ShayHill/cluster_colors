@@ -190,10 +190,11 @@ class Cluster:
         row_sums = self.members.pmatrix[self.ixs].sum(axis=1)
         min_cost = np.min(row_sums)
         arg_where_min = np.argwhere(row_sums == min_cost).flatten()
+        arg_where_min = [self.ixs[x] for x in arg_where_min]
 
         if len(arg_where_min) == 1:
-            return int(self.ixs[arg_where_min[0]])
-        return self._get_weighted_medoid(arg_where_min)
+            return int(arg_where_min[0])
+        return self._get_weighted_medoid(map(int, arg_where_min))
 
     @functools.cached_property
     def weighted_median(self) -> Vector:

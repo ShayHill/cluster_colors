@@ -38,17 +38,23 @@ class Members:
         :param weights: optional array (n,) of weights
         :param pmatrix: optional proximity matrix. If not given, will be calculated
             with squared Euclidean distance
-        """
-        self.vectors = np.array(list(map(list, vectors))).astype(float)
 
+        The vectors must be sorted in case any members has equal proximity to
+        multiple centers. When this happens, the centroid with the lowest
+        lexigraphical order is chosen.
+        """
+        vectors = np.asarray(vectors)
+        sort_indices = np.lexsort(vectors.T[::-1])
+
+        self.vectors = vectors[sort_indices]
         if weights is None:
             self.weights = np.ones(len(self.vectors))
         else:
-            self.weights = np.array(list(weights))
+            self.weights = np.array(list(weights))[sort_indices]
         if pmatrix is None:
             self.pmatrix = get_sqeuclidean_matrix(self.vectors)
         else:
-            self.pmatrix = pmatrix
+            self.pmatrix = pmatrix[sort_indices, sort_indices]
 
     def __len__(self) -> int:
         """Number of members in the Members instance.
@@ -94,7 +100,7 @@ class Members:
             with squared Euclidean distance
         :return: Members instance
         """
-        return cls(vectors, weights=(1 for _ in vectors), pmatrix=pmatrix)
+        return cls(vectors, pmatrix=pmatrix)
 
     @classmethod
     def from_stacked_vectors(

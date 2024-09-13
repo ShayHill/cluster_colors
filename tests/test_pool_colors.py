@@ -10,7 +10,9 @@
 # pyright: reportUnknownArgumentType=false
 # pyright: reportMissingParameterType=false
 
+from re import split
 from typing import TypeVar
+import random
 
 import numpy as np
 from PIL import Image
@@ -18,6 +20,7 @@ from PIL import Image
 from cluster_colors import pool_colors
 from cluster_colors.paths import TEST_DIR
 from cluster_colors.vector_stacker import stack_vectors
+from cluster_colors.clusters import DivisiveSupercluster
 
 _T = TypeVar("_T")
 
@@ -26,6 +29,7 @@ DIAG = np.array([(i, i, i, i + 1) for i in range(256)])
 img = Image.open(TEST_DIR / "sugar-shack-barnes.jpg")
 colors = np.array(img).reshape(-1, 1)[::16]
 stacked_colors = stack_vectors(colors)
+
 
 class TestPoolColors:
     def test_sum_weight(self):
@@ -42,6 +46,24 @@ class TestPoolColors:
         reduced = {tuple(x) for x in pool_colors.pool_colors(stacked_colors, 4)}
         reduced2 = {tuple(x) for x in pool_colors.pool_colors(stacked_colors[::-1], 4)}
         assert reduced == reduced2
+
+    def test_robust_to_order_with_ties(self):
+        """Order does not matter, even with ties."""
+
+        def split_ten_times(vecs):
+            clusters = DivisiveSupercluster.from_vectors(np.array(vecs))
+            for i in range(1):
+                clusters.split()
+            return {
+                tuple(sorted(x.ixs)) for x in clusters.clusters
+            }
+
+        vecs_ = [(x, y, z) for x in range(5) for y in range(4) for z in range(3)]
+        expect = split_ten_times(vecs_)
+        for i in range(100):
+            random.shuffle(vecs_)
+            result = split_ten_times(vecs_)
+            assert result == expect
 
     def test_singles(self):
         """When color has a weight of 1 and does not stack, return same."""
