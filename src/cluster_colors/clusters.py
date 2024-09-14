@@ -242,7 +242,7 @@ class _Supercluster(ABC):
         These will be the clusters (multiple if tie, which should be rare) with the
         highest sse.
         """
-        return max(self.clusters, key=lambda c: c.error_metric)
+        return max(self.clusters, key=lambda c: c.sum_error)
 
     def _get_next_to_merge(self) -> tuple[Cluster, Cluster]:
         """Return the next set of clusters to merge.
@@ -332,10 +332,12 @@ class _Supercluster(ABC):
         Supercluster instance will be left in an "atomized" (one member per cluster)
         state.
         """
-        while predicate(self):
-            self.split()
-        while not predicate(self):
-            self.merge()
+        with suppress(FailedToSplitError):
+            while predicate(self):
+                self.split()
+        with suppress(FailedToMergeError):
+            while not predicate(self):
+                self.merge()
 
     def get_min_proximity(self) -> float:
         """Return the minimum intercluster proximity."""
@@ -386,6 +388,7 @@ class _Supercluster(ABC):
         previous_states.add(state)
 
         which_medoid = np.argmin(self.members.pmatrix[medoids], axis=0)
+
         for i, cluster in enumerate(tuple(self.clusters)):
             new_where = np.argwhere(which_medoid == i)
             new = list(map(int, new_where.flatten()))

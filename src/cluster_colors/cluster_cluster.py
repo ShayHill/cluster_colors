@@ -21,7 +21,6 @@ if TYPE_CHECKING:
     from cluster_colors.type_hints import FPArray, ProximityMatrix, Vector, Vectors
 
 
-_sn_gen = itertools.count()
 
 
 def _construct_is_low(low: float, high: float) -> Callable[[float], bool]:
@@ -96,7 +95,6 @@ class Cluster:
             self.ixs = np.arange(len(self.members), dtype=np.int32)
         else:
             self.ixs = np.array(sorted(ixs), dtype=np.int32)
-        self.sn = next(_sn_gen)
 
     # ===========================================================================
     #   constructors
@@ -258,35 +256,27 @@ class Cluster:
         return eigenvectors[:, np.argmax(eigenvalues)]
 
     @functools.cached_property
-    def error(self) -> float:
+    def sum_error(self) -> float:
         """Get the sum of proximity errors of all members.
 
         :return: sum of squared errors of all members
         """
         if len(self.ixs) == 1:
             return 0
-        return float(np.sum(self.members.weighted_pmatrix[self.weighted_medoid]))
+        pmatrix = self.members.pmatrix
+        weights = pmatrix[self.weighted_medoid, self.ixs]
+        aaa = float(np.sum(weights))
+        # aaa = float(np.sum(self.members.weighted_pmatrix[self.weighted_medoid, self.ixs]))
+        # TODO: clean up all these temp variables
+        return aaa
 
-    @property
-    def error_metric(self) -> tuple[float, int]:
-        """Break ties in the error property.
-
-        :return: the error and negative sn so older cluster will split in case of a
-            tie.
-
-        Ties aren't likely, but just to keep everything deterministic.
-        """
-        return self.error, -self.sn
 
     def get_merge_error(self, other: Cluster) -> float:
         """Get the complete linkage error of merging this cluster with another.
 
         :return: sum of squared errors of all members if merged with another cluster
         """
-        try:
-            return float(np.max(self.members.pmatrix[np.ix_(self.ixs, other.ixs)]))
-        except:
-            breakpoint()
+        return float(np.max(self.members.pmatrix[np.ix_(self.ixs, other.ixs)]))
 
     def get_merge_error_metric(self, other: Cluster) -> tuple[float, int]:
         """Break ties in the get_merge_error property.
@@ -296,9 +286,9 @@ class Cluster:
 
         Ties aren't likely, but just to keep everything deterministic.
         """
-        return self.get_merge_error(other), -max(self.sn, other.sn)
+        return self.get_merge_error(other)
 
-    def split(self) -> Annotated[set[Cluster], "doubleton"]:
+    def split(self) -> tuple[Cluster, Cluster]:
         """Split cluster into two clusters.
 
         :return: two new clusters
@@ -323,7 +313,7 @@ class Cluster:
         split = _split_floats([s for s, *_ in scored])
         if split in {0, len(scored)}:
             split = len(scored) // 2
-        return {
+        return (
             Cluster(self.members, [x for *_, x in scored[:split]]),
             Cluster(self.members, [x for *_, x in scored[split:]]),
-        }
+        )

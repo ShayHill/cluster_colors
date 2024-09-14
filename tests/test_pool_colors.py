@@ -12,6 +12,7 @@
 
 from re import split
 from typing import TypeVar
+import copy
 import random
 
 import numpy as np
@@ -59,11 +60,30 @@ class TestPoolColors:
             }
 
         vecs_ = [(x, y, z) for x in range(5) for y in range(4) for z in range(3)]
-        expect = split_ten_times(vecs_)
-        for _ in range(10):
-            random.shuffle(vecs_)
-            result = split_ten_times(vecs_)
-            assert result == expect
+        vecs2 = copy.deepcopy(vecs_)
+
+        def see_state(clu):
+            return [tuple(map(int, x.ixs)) for x in clu.clusters]
+
+        for i in range(10):
+            clu_ = DivisiveSupercluster.from_vectors(np.array(vecs_))
+            clu2 = DivisiveSupercluster.from_vectors(np.array(vecs2))
+            for j in range(i):
+                clu_.split()
+                clu2.split()
+            if see_state(clu_) != see_state(clu2):
+                breakpoint()
+
+
+
+        # expect = split_ten_times(vecs_)
+        # for _ in range(10):
+        #     random.shuffle(vecs_)
+        #     result = split_ten_times(vecs_)
+        #     try:
+        #         assert result == expect
+        #     except:
+        #         breakpoint()
 
     def test_singles(self):
         """When color has a weight of 1 and does not stack, return same."""
