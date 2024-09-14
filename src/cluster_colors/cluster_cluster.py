@@ -283,7 +283,10 @@ class Cluster:
 
         :return: sum of squared errors of all members if merged with another cluster
         """
-        return float(np.max(self.members.pmatrix[np.ix_(self.ixs, other.ixs)]))
+        try:
+            return float(np.max(self.members.pmatrix[np.ix_(self.ixs, other.ixs)]))
+        except:
+            breakpoint()
 
     def get_merge_error_metric(self, other: Cluster) -> tuple[float, int]:
         """Break ties in the get_merge_error property.

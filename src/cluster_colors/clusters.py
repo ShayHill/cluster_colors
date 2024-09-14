@@ -281,7 +281,8 @@ class _Supercluster(ABC):
         self._restore_state_as_close_as_possible_to_n(n)
         while self.n > n:
             cluster_a, cluster_b = self._get_next_to_merge()
-            merged = Cluster(self.members, cluster_a.ixs + cluster_b.ixs)
+            merged_ixs = np.concatenate((cluster_a.ixs, cluster_b.ixs))
+            merged = Cluster(self.members, merged_ixs)
             del self.clusters[cluster_a]
             del self.clusters[cluster_b]
             self.clusters[merged] = None

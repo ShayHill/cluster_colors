@@ -17,7 +17,7 @@ import numpy.typing as npt
 import pytest
 
 from cluster_colors.vector_stacker import stack_vectors
-from cluster_colors.clusters import DivisiveSupercluster
+from cluster_colors.clusters import AgglomerativeSupercluster, DivisiveSupercluster
 
 ColorsArray = Annotated[npt.NDArray[np.float64], (-1, 3)]
 
@@ -36,14 +36,18 @@ class TestKMedians:
         clusters.set_min_proximity(16 ** 2)
         _ = clusters.as_stacked_vectors
 
-    def test_set_n(self, colors: ColorsArray):
-        """Test that the clusters are sorted by the number of colors in them"""
+    def test_split_to_n(self, colors: ColorsArray):
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(10)
-        _ = clusters.as_stacked_vectors
+        assert clusters.as_stacked_vectors.shape == (10, 4)
 
     def test_get_rsorted_exemplars(self, colors: ColorsArray):
         """Test that the clusters are sorted by the number of colors in them"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_min_proximity(16 ** 2)
         _ = clusters.as_vectors
+
+    def test_merge_to_n(self, colors: ColorsArray):
+        clusters = AgglomerativeSupercluster.from_stacked_vectors(colors)
+        clusters.set_n(10)
+        assert clusters.as_stacked_vectors.shape == (10, 4)

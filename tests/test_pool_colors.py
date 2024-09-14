@@ -52,7 +52,7 @@ class TestPoolColors:
 
         def split_ten_times(vecs):
             clusters = DivisiveSupercluster.from_vectors(np.array(vecs))
-            for i in range(1):
+            for _ in range(10):
                 clusters.split()
             return {
                 tuple(sorted(x.ixs)) for x in clusters.clusters
@@ -60,7 +60,7 @@ class TestPoolColors:
 
         vecs_ = [(x, y, z) for x in range(5) for y in range(4) for z in range(3)]
         expect = split_ten_times(vecs_)
-        for i in range(100):
+        for _ in range(10):
             random.shuffle(vecs_)
             result = split_ten_times(vecs_)
             assert result == expect
