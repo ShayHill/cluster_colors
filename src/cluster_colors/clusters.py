@@ -254,7 +254,7 @@ class _Supercluster(ABC):
         lowest sse.
         """
         pairs = it.combinations(self.clusters, 2)
-        return min(pairs, key=lambda p: p[0].get_merge_error_metric(p[1]))
+        return min(pairs, key=lambda p: p[0].get_merge_max_error(p[1]))
 
     # ===========================================================================
     #   perform splits and merges

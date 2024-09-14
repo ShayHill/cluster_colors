@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import functools
 import itertools
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING
 
 import numpy as np
 from stacked_quantile import get_stacked_medians
@@ -19,8 +19,6 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
     from cluster_colors.type_hints import FPArray, ProximityMatrix, Vector, Vectors
-
-
 
 
 def _construct_is_low(low: float, high: float) -> Callable[[float], bool]:
@@ -263,30 +261,28 @@ class Cluster:
         """
         if len(self.ixs) == 1:
             return 0
-        pmatrix = self.members.pmatrix
+        pmatrix = self.members.weighted_pmatrix
         weights = pmatrix[self.weighted_medoid, self.ixs]
-        aaa = float(np.sum(weights))
-        # aaa = float(np.sum(self.members.weighted_pmatrix[self.weighted_medoid, self.ixs]))
-        # TODO: clean up all these temp variables
-        return aaa
+        return float(np.sum(weights))
 
+    @functools.cached_property
+    def max_error(self) -> float:
+        """Get the maximum proximity error between any two members.
 
-    def get_merge_error(self, other: Cluster) -> float:
+        :return: maximum squared error of all members
+        """
+        if len(self.ixs) == 1:
+            return 0
+        pmatrix = self.members.pmatrix
+        weights = pmatrix[np.ix_(self.ixs, self.ixs)]
+        return float(np.max(weights))
+
+    def get_merge_max_error(self, other: Cluster) -> float:
         """Get the complete linkage error of merging this cluster with another.
 
         :return: sum of squared errors of all members if merged with another cluster
         """
         return float(np.max(self.members.pmatrix[np.ix_(self.ixs, other.ixs)]))
-
-    def get_merge_error_metric(self, other: Cluster) -> tuple[float, int]:
-        """Break ties in the get_merge_error property.
-
-        :return: the error and negative of max sn so older cluster will merge in
-            case of a tie.
-
-        Ties aren't likely, but just to keep everything deterministic.
-        """
-        return self.get_merge_error(other)
 
     def split(self) -> tuple[Cluster, Cluster]:
         """Split cluster into two clusters.
