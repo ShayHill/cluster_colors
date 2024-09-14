@@ -1,8 +1,4 @@
-"""One member of a cluster.
-
-I left some flexibility in this library to work with vectors of any length, but there
-are specialized methods for working with RGB colors. These will fail if the vector is
-not 3 values long.
+"""Members of a cluster represented as a list of vectors with a proximity matrix.
 
 :author: Shay Hill
 :created: 2024-09-01

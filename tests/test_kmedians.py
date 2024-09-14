@@ -19,7 +19,7 @@ import pytest
 from cluster_colors.vector_stacker import stack_vectors
 from cluster_colors.clusters import DivisiveSupercluster
 
-ColorsArray = Annotated[npt.NDArray[np.float_], (-1, 3)]
+ColorsArray = Annotated[npt.NDArray[np.float64], (-1, 3)]
 
 @pytest.fixture(
     scope="function",
@@ -28,15 +28,22 @@ ColorsArray = Annotated[npt.NDArray[np.float_], (-1, 3)]
 def colors(request) -> ColorsArray:
     return stack_vectors(request.param)
 
+
 class TestKMedians:
     def test_get_rsorted_clusters(self, colors: ColorsArray):
         """Test that the clusters are sorted by the number of colors in them"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
-        clusters.set_min_proximity(100/3)
+        clusters.set_min_proximity(16 ** 2)
+        _ = clusters.as_stacked_vectors
+
+    def test_set_n(self, colors: ColorsArray):
+        """Test that the clusters are sorted by the number of colors in them"""
+        clusters = DivisiveSupercluster.from_stacked_vectors(colors)
+        clusters.set_n(10)
         _ = clusters.as_stacked_vectors
 
     def test_get_rsorted_exemplars(self, colors: ColorsArray):
         """Test that the clusters are sorted by the number of colors in them"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
-        clusters.set_min_proximity(100/3)
+        clusters.set_min_proximity(16 ** 2)
         _ = clusters.as_vectors

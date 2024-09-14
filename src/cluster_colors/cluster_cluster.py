@@ -146,6 +146,24 @@ class Cluster:
         """
         return sum(self.members.weights[self.ixs])
 
+    @property
+    def as_vector(self) -> Vector:
+        """Get the exemplar as a vector.
+
+        :return: weighted median as a vector
+        """
+        return self.weighted_median
+
+    @property
+    def as_stacked_vector(self) -> Vector:
+        """Get the exemplar as a stacked vector.
+
+        :return: [*weighted_median, weight] as a stacked vector
+        """
+        vector = self.as_vector
+        weight = sum(self.members.weights[self.ixs])
+        return np.append(vector, weight)
+
     # ===========================================================================
     #   Cluster centers
     # ===========================================================================
@@ -208,23 +226,6 @@ class Cluster:
         """
         weights = self.members.weights[self.ixs].reshape(-1, 1)
         return get_stacked_medians(self.members.vectors[self.ixs], weights)
-
-    @property
-    def as_vector(self) -> Vector:
-        """Get the exemplar as a vector.
-
-        :return: exemplar as a vector
-        """
-        return self.members.vectors[self.weighted_medoid]
-
-    @property
-    def as_stacked_vector(self) -> Vector:
-        """Get the exemplar as a stacked vector.
-
-        :return: exemplar as a stacked vector
-        """
-        weight = self.members.weights[self.weighted_medoid]
-        return np.append(self.as_vector, weight)
 
     @property
     def covariance_matrix(self) -> FPArray:
