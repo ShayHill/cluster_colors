@@ -1,5 +1,11 @@
 """Type for a single cluster.
 
+Each Cluster instance holds a Members instance and a list of indices to vectors in
+that instance. Clusters have multiple errors and centers defined for various
+purposes, including two centroids, weighted and unweighted medoid, used within the
+clustering algorithm. See the docstrings for why and where each centroid is used, but
+this is a deviation from strict k-medoids.
+
 :author: Shay Hill
 :created: 2024-09-03
 """
@@ -52,6 +58,12 @@ def _split_floats(floats: Iterable[float]) -> int:
 
     :param floats: An iterable of float numbers.
     :return: An index of the list that minimizes the sum of errors.
+
+    This is used to find a natural split along the axis of highest variance, if such
+    exists. During the k-medoids clustering, this little bit of intelligence will
+    matter less, because the SuperclusterBase._reassign method will help address poor
+    splits, but a few hundredths of a second is worth the effort during the median
+    cut (`cut_colors`) process.
     """
     floats = sorted(floats)
     if len(floats) < 2:
@@ -94,14 +106,14 @@ class Cluster:
     def from_vectors(
         cls, vectors: VectorsLike, pmatrix: ProximityMatrix | None = None
     ) -> Cluster:
-        """Create a Cluster instance from an iterable of colors.
+        """Create a Cluster instance from a sequence or array of colors.
 
-        :param stacked_vectors: An iterable of vectors with a weight axis
-            [(r0, g0, b0, w0), (r1, g1, b1, w1), ...]
+        :param vectors: An iterable of vectors
+            [(r0, g0, b0), (r1, g1, b1), ...]
         :param pmatrix: optional proximity matrix. If not given, will be calculated
             with squared Euclidean distance
         :return: A Cluster instance with members
-            {Member([r0, g0, b0, w0]), Member([r1, g1, b1, w1]), ...}
+            {Member([r0, g0, b0, 1]), Member([r1, g1, b1, 1]), ...}
         """
         members = Members.from_vectors(vectors, pmatrix=pmatrix)
         return cls(members)
@@ -110,9 +122,10 @@ class Cluster:
     def from_stacked_vectors(
         cls, stacked_vectors: VectorsLike, pmatrix: ProximityMatrix | None = None
     ) -> Cluster:
-        """Create a Cluster instance from an iterable of colors.
+        """Create a Cluster instance from an array of colors with a weight axis.
 
         :param stacked_vectors: An iterable of vectors with a weight axis
+            [(r0, g0, b0, w0), (r1, g1, b1, w1), ...]
         :param pmatrix: optional proximity matrix. If not given, will be calculated
             with squared Euclidean distance
             [(r0, g0, b0, w0), (r1, g1, b1, w1), ...]
@@ -158,7 +171,7 @@ class Cluster:
     def get_as_stacked_vector(self, which_center: CenterName | None = None) -> Vector:
         """Get the exemplar as a stacked vector.
 
-        :return: [*weighted_median, weight] as a stacked vector
+        :return: [*center, weight] as a stacked vector
         :param which_center: optionally specify a cluster center attribute. Choices
             are 'weighted_median', 'weighted_medoid', or 'unweighted_medoid'. Default
             is 'weighted_median'.
@@ -175,7 +188,8 @@ class Cluster:
         """Get the index of the mediod, respecting weights.
 
         :param ixs: optional subset of members indices. I can't see a use case for
-            manually passing this, but it's here to break ties in property medoid.
+            manually passing this, but it's here to break ties in property
+            unweighted_medoid.
         :return: index of the mediod, respecting weights
         """
         ixs_ = self.ixs if ixs is None else np.array(list(ixs), dtype=np.int32)
@@ -228,13 +242,17 @@ class Cluster:
 
         This is categorically different than the medoid, because the median is not a
         member of the cluster. So this property is not an index to the cluster
-        members, but a vector is likely not coincident with any member.
+        members, but a vector that is likely not coincident with any member.
         """
         weights = self.members.weights[self.ixs].reshape(-1, 1)
         return get_stacked_medians(self.members.vectors[self.ixs], weights)
 
+    # ===========================================================================
+    #   covariance matrix and eigenvectors
+    # ===========================================================================
+
     @property
-    def covariance_matrix(self) -> FPArray:
+    def _covariance_matrix(self) -> FPArray:
         """Get the covariance matrix of the cluster.
 
         :return: covariance matrix of the cluster
@@ -249,7 +267,7 @@ class Cluster:
 
         :return: tuple of eigenvalues and eigenvectors
         """
-        eigenvalues, eigenvectors = np.linalg.eig(self.covariance_matrix)
+        eigenvalues, eigenvectors = np.linalg.eig(self._covariance_matrix)
         return np.real(eigenvalues), np.real(eigenvectors)
 
     @property
@@ -283,7 +301,11 @@ class Cluster:
     def max_error(self) -> float:
         """Get the max of proximity errors of all members.
 
-        :return: max of errors of all members
+        :return: max of proximity errors of all members
+
+        As elsewhere, weights are treated as frequencies, so the maximum error is the
+        error of the most distant member, regardless of weight, even if that weight
+        is 0.
         """
         if len(self.ixs) == 1:
             return 0
@@ -310,7 +332,9 @@ class Cluster:
         :return: impurity of the cluster
 
         Impurity is the proportion of the cluster's sum_error to the weight of the
-        cluster.
+        cluster. This metric is useful for splitting clusters with meaningful
+        outliers, where sum_error might split heavy clusters, even when the members
+        are close.
         """
         if len(self.ixs) == 1:
             return 0
@@ -325,7 +349,7 @@ class Cluster:
     def get_merge_span(self, other: Cluster) -> float:
         """Get the complete linkage error of merging this cluster with another.
 
-        :return: sum of squared errors of all members if merged with another cluster
+        :return: max error between any two members of self | other
         """
         return float(np.max(self.members.pmatrix[np.ix_(self.ixs, other.ixs)]))
 

@@ -1,5 +1,24 @@
 """The members, clusters, and groups of clusters.
 
+SuperclusterBase is an abstract class that can split or merge clusters.
+
+SuperclusterBase caches states (lists of cluster indices, each defining a Cluster,
+given a number of clusters) when splitting or merging.
+
+A supercluster that starts as one large cluster will cache states as that cluster
+and its descendants are split, and merging from any state in that cluster will be
+loading a previouly cached state.
+
+Similarly, a supercluster that starts as singletons will cache states as those
+singletons and their descendants are merged, and splitting from any state in that
+cluster will be loading a previously cached state.
+
+The result of this is that a supercluster started as one large cluster will never
+merge (only split and un-split) and a supercluster started as singletons will
+never split (only merge and un-merge). The only thing required to make this a
+divisive or agglomerative class is to implement the `_initialize_clusters` method
+to return either a single cluster or a cluster for each member.
+
 :author: Shay Hill
 :created: 2023-01-17
 """
@@ -55,40 +74,12 @@ _SuperclusterT = TypeVar("_SuperclusterT", bound="SuperclusterBase")
 
 
 class SuperclusterBase(ABC):
-    """A set of Cluster instances.
-
-    Cache states (sets of cluster indices given a number of clusters) when splitting
-    or merging.
-
-    A supercluster that starts as one large cluster will cache states as that cluster
-    and its descendants are split, and merging from any state in that cluster will be
-    loading a previouly cached state.
-
-    Similarly, a supercluster that starts as singletons will cache states as those
-    singletons and their descendants are merged, and splitting from any state in that
-    cluster will be loading a previously cached state.
-
-    The result of this is that a supercluster started as one large cluster will never
-    merge (only split and un-split) and a supercluster started as singletons will
-    never split (only merge and un-merge). The only thing required to make this a
-    divisive or agglomerative class is to implement the _initialize_clusters method
-    to return either a single cluster or a cluster for each member.
-
-    There is a slight trick in implementing this method, as the clusters are kept as
-    a `dict[Cluster, None]` but are otherwise treated as a set. This is to maintain
-    insertion order, which is important for tie-breaking with the same error metric
-    (older clusters are split first in case of a tie). Ties are unlikely to happen
-    when clustering colors, but the class is available for clustering sequential
-    integers as (1,) arrays.
-    """
+    """A list of Cluster instances."""
 
     def __init__(self, members: Members) -> None:
         """Create a new Supercluster instance.
 
         :param members: Members instance
-
-        Clusters are kept in a dictionary to maintain insertion order to make
-        tie-breaking with the same error metric deterministic.
         """
         self.members = members
         self.clusters = self._initialize_clusters()
@@ -110,12 +101,14 @@ class SuperclusterBase(ABC):
         vectors: VectorsLike,
         pmatrix: ProximityMatrix | None = None,
     ) -> _SuperclusterT:
-        """Create a new Supercluster instance from stacked vectors.
+        """Create a SuperclusterBase instance from a sequence or array of colors.
 
-        :param stacked_vectors: members as a numpy array (n, m+1) with the last
-            column as the weight.
+        :param vectors: An iterable of vectors
+            [(r0, g0, b0), (r1, g1, b1), ...]
         :param pmatrix: optional proximity matrix. If not given, will be calculated
             with squared Euclidean distance
+        :return: A SuperclusterBase instance with members
+            {Member([r0, g0, b0, 1]), Member([r1, g1, b1, 1]), ...}
         """
         members = Members.from_vectors(vectors, pmatrix=pmatrix)
         return cls(members)
@@ -126,12 +119,15 @@ class SuperclusterBase(ABC):
         stacked_vectors: VectorsLike,
         pmatrix: ProximityMatrix | None = None,
     ) -> _SuperclusterT:
-        """Create a new Supercluster instance from stacked vectors.
+        """Create a Cluster instance from an array of colors with a weight axis.
 
-        :param stacked_vectors: members as a numpy array (n, m+1) with the last
-            column as the weight.
+        :param stacked_vectors: An iterable of vectors with a weight axis
+            [(r0, g0, b0, w0), (r1, g1, b1, w1), ...]
         :param pmatrix: optional proximity matrix. If not given, will be calculated
             with squared Euclidean distance
+            [(r0, g0, b0, w0), (r1, g1, b1, w1), ...]
+        :return: A SuperclusterBase instance with members
+            {Member([r0, g0, b0, w0]), Member([r1, g1, b1, w1]), ...}
         """
         members = Members.from_stacked_vectors(stacked_vectors, pmatrix=pmatrix)
         return cls(members)
@@ -249,20 +245,14 @@ class SuperclusterBase(ABC):
 
         :return: set of clusters with sse == max(sse)
         :raise ValueError: if no clusters are available to split
-
-        These will be the clusters (multiple if tie, which should be rare) with the
-        highest sse.
         """
-        return max(self.clusters, key=lambda c: c.span)
+        return max(self.clusters, key=lambda c: c.sum_error)
 
     def _get_next_to_merge(self) -> tuple[Cluster, Cluster]:
         """Return the next set of clusters to merge.
 
         :return: set of clusters with sse == min(sse)
         :raise ValueError: if no clusters are available to merge
-
-        These will be the clusters (multiple if tie, which should be rare) with the
-        lowest sse.
         """
         pairs = it.combinations(self.clusters, 2)
         return min(pairs, key=lambda p: p[0].get_merge_span(p[1]))
@@ -298,7 +288,7 @@ class SuperclusterBase(ABC):
             self.clusters.append(merged)
 
     # ===========================================================================
-    #   public methods
+    #   common public methods
     # ===========================================================================
 
     def set_n(self, n: int) -> None:
@@ -328,6 +318,16 @@ class SuperclusterBase(ABC):
         if len(self.clusters) == 1:
             raise FailedToMergeError
         self._merge_to_n(self.n - 1)
+
+    # ===========================================================================
+    #   split or merge to satisfy a condition
+    #
+    #   For every condition defined here, the condition will be satisfied when a
+    #   one-cluster state or all-singletons state is reached (as appropriate), but
+    #   other conditions may be patched in that to do satisfy this. In those
+    #   instances, the splitting or merging will silenty give up when the minimum or
+    #   maximum number of clusters is reached.
+    # ===========================================================================
 
     def get_max_sum_error(self) -> float:
         """Return the maximum sum of errors of any cluster."""
@@ -409,6 +409,10 @@ class SuperclusterBase(ABC):
             while predicate():
                 self.split()
 
+    # ===========================================================================
+    #   the reassignment step for divisive clustering
+    # ===========================================================================
+
     def _reassign(self, _previous_medoids: set[tuple[int, ...]] | None = None):
         """Reassign members based on proximity to cluster medoids.
 
@@ -450,14 +454,14 @@ class SuperclusterBase(ABC):
 
 
 class DivisiveSupercluster(SuperclusterBase):
-    """A set of Cluster instances for divisive clustering."""
+    """A list of Cluster instances for divisive clustering."""
 
     def _initialize_clusters(self) -> list[Cluster]:
         return [Cluster(self.members)]
 
 
 class AgglomerativeSupercluster(SuperclusterBase):
-    """A set of Cluster instances for agglomerative clustering."""
+    """A list of Cluster instances for agglomerative clustering."""
 
     def _initialize_clusters(self) -> list[Cluster]:
         return [Cluster(self.members, [i]) for i in range(len(self.members))]

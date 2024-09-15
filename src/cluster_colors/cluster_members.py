@@ -1,5 +1,12 @@
 """Members of a cluster represented as a list of vectors with a proximity matrix.
 
+The clustering algorithms in this package do not calculate proximity, but only refer
+to a given proximity matrix. This means that more expensive proximity calculations
+can be used with the minimum penalty. Each Supercluster and the Clusters it contains
+share a single Members instance. This instance holds all vector information and a few
+variants of the proximity matrix. A Cluster is defined by the indices of the members
+it contains.
+
 :author: Shay Hill
 :created: 2024-09-01
 """
@@ -21,7 +28,7 @@ if TYPE_CHECKING:
 
 
 class Members:
-    """A list of cluster members with a proximity matrix."""
+    """A list of cluster vectors with a proximity matrix."""
 
     def __init__(
         self,
@@ -36,6 +43,13 @@ class Members:
         :param weights: optional array (n,) of weights
         :param pmatrix: optional proximity matrix. If not given, will be calculated
             with squared Euclidean distance
+
+        The `weights` argument is optional, but each member must have a weight. If
+        `weights` is None, the weights are assumed to be the last axis of the vectors
+        argument. This is consistent with `stacked_vectors` or image colors as
+        `(r,g,b,a)`. If weights is a scalar, all members are given that weight. This
+        is useful for clustering non-color vectors or other instances where all
+        vectors should be treated with the same priority.
 
         The vectors must be sorted in case any members has equal proximity to
         multiple centers. When this happens, the centroid with the lowest
