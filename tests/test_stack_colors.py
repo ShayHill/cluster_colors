@@ -78,23 +78,15 @@ class TestStackVectors:
 
 class TestStackColors:
     def test_stack_vectors(self):
-        """Test the stack_vectors method on 3-axis vectors."""
-        np.testing.assert_array_equal(
-            sv.stack_vectors(np.array([[1, 2, 3], [4, 5, 6], [1, 2, 3]])),
-            np.array([[1, 2, 3, 510], [4, 5, 6, 255]]),
-        )
-
-    def test_stack_vectors(self):
         """Test the stack_vectors method on 4-axis vectors."""
         np.testing.assert_array_equal(
             sv.stack_vectors(np.array([[1, 2, 3, 55], [4, 5, 6, 5], [1, 2, 3, 45]])),
             np.array([[1, 2, 3, 100], [4, 5, 6, 5]]),
         )
 
-    # TODO: restore test for 1-axis vectors
-    # def test_stack_vectors(self):
-    #     """Test the stack_vectors method on 1-axis vectors."""
-    #     np.testing.assert_array_equal(
-    #         sv.stack_vectors(np.array([[1], [4], [1]])),
-    #         np.array([[1, 510], [4, 255]]),
-    #     )
+    def test_stack_single_vectors(self):
+        """Test the stack_vectors method on 1-axis vectors."""
+        np.testing.assert_array_equal(
+            sv.stack_vectors(np.array([[1, 1], [4, 1], [1, 1]])),
+            np.array([[1, 2], [4, 1]]),
+        )
