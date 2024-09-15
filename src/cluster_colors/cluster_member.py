@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 from basic_colormath import get_sqeuclidean_matrix
 
+from cluster_colors.vector_stacker import add_weight_axis, stack_vectors
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
@@ -25,7 +27,7 @@ class Members:
         self,
         vectors: VectorsLike,
         *,
-        weights: Iterable[float] | None = None,
+        weights: Iterable[float] | float | None = None,
         pmatrix: ProximityMatrix | None = None,
     ) -> None:
         """Create a new Members instance.
@@ -39,14 +41,20 @@ class Members:
         multiple centers. When this happens, the centroid with the lowest
         lexigraphical order is chosen.
         """
-        vectors = np.asarray(vectors)
-        sort_indices = np.lexsort(vectors.T[::-1])
+        self._stacked_vectors = np.asarray(vectors)
 
-        self.vectors = vectors[sort_indices]
         if weights is None:
-            self.weights = np.ones(len(self.vectors))
+            pass
+        elif isinstance(weights, int | float):
+            self._stacked_vectors = add_weight_axis(self._stacked_vectors, weights)
         else:
-            self.weights = np.array(list(weights))[sort_indices]
+            weights = np.asarray(list(weights)).reshape(-1, 1)
+            self._stacked_vectors = np.hstack((self._stacked_vectors, weights))
+
+        sort_indices = np.lexsort(self._stacked_vectors.T[::-1])
+        self._stacked_vectors = self._stacked_vectors[sort_indices]
+        self._stacked_vectors = stack_vectors(self._stacked_vectors)
+
         if pmatrix is None:
             self.pmatrix = get_sqeuclidean_matrix(self.vectors)
         else:
@@ -58,6 +66,22 @@ class Members:
         :return: number of members
         """
         return len(self.vectors)
+
+    @property
+    def vectors(self) -> FPArray:
+        """Array of vectors.
+
+        :return: array of vectors
+        """
+        return self._stacked_vectors[:, :-1]
+
+    @property
+    def weights(self) -> FPArray:
+        """Array of weights.
+
+        :return: array of weights
+        """
+        return self._stacked_vectors[:, -1]
 
     @functools.cached_property
     def weighted_pmatrix(self) -> ProximityMatrix:
@@ -96,7 +120,7 @@ class Members:
             with squared Euclidean distance
         :return: Members instance
         """
-        return cls(vectors, pmatrix=pmatrix)
+        return cls(vectors, weights=1, pmatrix=pmatrix)
 
     @classmethod
     def from_stacked_vectors(
@@ -110,5 +134,4 @@ class Members:
             with squared Euclidean distance
         :return: Members instance
         """
-        vectors = np.asarray(stacked_vectors)
-        return cls(vectors[:, :-1], weights=vectors[:, -1], pmatrix=pmatrix)
+        return cls(stacked_vectors, weights=None, pmatrix=pmatrix)

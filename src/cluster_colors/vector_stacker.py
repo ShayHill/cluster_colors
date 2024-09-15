@@ -54,8 +54,8 @@ def add_weight_axis(
     if weight <= 0:
         msg = f"Weight must be greater than 0. Got {weight}."
         raise ValueError(msg)
-    ws = np.full(vectors.shape[:-1] + (1,), weight)
-    return np.append(vectors, ws, axis=-1).astype(float)
+    ws = np.ones(vectors.shape[0]).reshape(-1, 1) * weight
+    return np.hstack([vectors, ws]).astype(float)
 
 
 def stack_vectors(

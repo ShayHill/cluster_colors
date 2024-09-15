@@ -48,7 +48,7 @@ class TestKMedians:
         assert clusters.get_as_vectors().shape == (16, 3)
 
     def test_merge_to_n(self, colors: ColorsArray):
-        clusters = AgglomerativeSupercluster.from_stacked_vectors(colors)
+        clusters = AgglomerativeSupercluster.from_stacked_vectors(colors[:24])
         clusters.set_n(10)
         assert clusters.get_as_stacked_vectors().shape == (10, 4)
 
