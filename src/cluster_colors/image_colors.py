@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from PIL import Image
 
-from cluster_colors.clusters import DivisiveSupercluster
+from cluster_colors.clusters import DivisiveSupercluster, SuperclusterBase
 from cluster_colors.config import CACHE_DIR
 from cluster_colors.cut_colors import cut_colors
 from cluster_colors.paths import BINARIES_DIR
@@ -78,20 +78,6 @@ def stack_image_colors(
     return colors
 
 
-def get_biggest_color(stacked_colors: Vectors) -> tuple[float, ...]:
-    """Get the color with the highest weight.
-
-    :param stacked_colors: an array of colors with weight axes
-    :return: the color with the highest weight
-
-    Cluster into large clusters, then return the exemplar of the biggest cluster.
-    """
-    quarter_colorspace_se = 64**2
-    clusters = DivisiveSupercluster.from_stacked_vectors(stacked_colors)
-    clusters.set_max_max_error(quarter_colorspace_se)
-    return clusters.get_as_vectors()[0]
-
-
 def get_image_clusters(
     filename: Path | str,
     num_colors: int = 512,
@@ -116,7 +102,7 @@ def get_image_clusters(
     return DivisiveSupercluster.from_stacked_vectors(stacked_colors)
 
 
-def show_clusters(supercluster: DivisiveSupercluster, filename_stem: str) -> None:
+def show_clusters(supercluster: SuperclusterBase, filename_stem: str) -> None:
     """Create a png with the exemplar of each cluster.
 
     :param supercluster: the clusters to show
@@ -136,4 +122,4 @@ def show_clusters(supercluster: DivisiveSupercluster, filename_stem: str) -> Non
     image = np.concatenate(stripes, axis=1)
 
     image = Image.fromarray(image)
-    image.save(BINARIES_DIR / f"{filename_stem}-{len(supercluster.members)}.png")
+    image.save(BINARIES_DIR / f"{filename_stem}-{len(supercluster.clusters)}.png")

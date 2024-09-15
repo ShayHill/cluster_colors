@@ -51,10 +51,10 @@ class FailedToMergeError(Exception):
         super().__init__(self.message)
 
 
-_SuperclusterT = TypeVar("_SuperclusterT", bound="_Supercluster")
+_SuperclusterT = TypeVar("_SuperclusterT", bound="SuperclusterBase")
 
 
-class _Supercluster(ABC):
+class SuperclusterBase(ABC):
     """A set of Cluster instances.
 
     Cache states (sets of cluster indices given a number of clusters) when splitting
@@ -455,14 +455,14 @@ class _Supercluster(ABC):
             self._reassign(previous_states)
 
 
-class DivisiveSupercluster(_Supercluster):
+class DivisiveSupercluster(SuperclusterBase):
     """A set of Cluster instances for divisive clustering."""
 
     def _initialize_clusters(self) -> dict[Cluster, None]:
         return {Cluster(self.members): None}
 
 
-class AgglomerativeSupercluster(_Supercluster):
+class AgglomerativeSupercluster(SuperclusterBase):
     """A set of Cluster instances for agglomerative clustering."""
 
     def _initialize_clusters(self) -> dict[Cluster, None]:

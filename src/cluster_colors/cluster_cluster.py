@@ -226,7 +226,7 @@ class Cluster:
         if len(self.ixs) < 3:
             return self._get_weighted_medoid()
 
-        row_sums = self.members.pmatrix[self.ixs].sum(axis=1)
+        row_sums = self.members.pmatrix[np.ix_(self.ixs, self.ixs)].sum(axis=1)
         min_cost = np.min(row_sums)
         arg_where_min = np.argwhere(row_sums == min_cost).flatten()
         arg_where_min = [self.ixs[x] for x in arg_where_min]
