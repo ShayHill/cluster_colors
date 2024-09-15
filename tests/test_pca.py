@@ -6,9 +6,11 @@
 
 # pyright: reportPrivateUsage=false
 
-from cluster_colors import cluster_supercluster
-import numpy as np
 import math
+
+import numpy as np
+
+from cluster_colors import cluster_supercluster
 
 
 class TestPCA:
@@ -39,7 +41,3 @@ class TestPCA:
         tall_rect = np.array([[1, 1, 1], [2, 1, 1], [2, 5, 1], [1, 5, 1]])
         cluster_ = cluster_supercluster.Cluster.from_stacked_vectors(tall_rect)
         np.testing.assert_allclose(cluster_._direction_of_highest_variance, (0, 1))
-
-
-
-

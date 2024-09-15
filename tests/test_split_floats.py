@@ -7,6 +7,7 @@
 # pyright: reportPrivateUsage=false
 
 import pytest
+
 from cluster_colors.cluster_cluster import _split_floats
 
 

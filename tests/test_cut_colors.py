@@ -3,19 +3,20 @@
 :author: Shay Hill
 :created: 2022-10-22
 """
+
 # pyright: reportPrivateUsage=false
 # pyright: reportUnknownMemberType=false
 # pyright: reportUnknownVariableType=false
 # pyright: reportMissingParameterType=false
 # pyright: reportUnknownParameterType=false
 
-import numpy as np
-import numpy.typing as npt
 from typing import Annotated
 
-from cluster_colors import cut_colors, vector_stacker as sv
-
+import numpy as np
+import numpy.typing as npt
 import pytest
+
+from cluster_colors import cut_colors, vector_stacker as sv
 
 ColorsArray = Annotated[npt.NDArray[np.float64], (-1, 3)]
 

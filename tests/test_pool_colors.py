@@ -3,6 +3,7 @@
 :author: Shay Hill
 :created: 2022-09-19
 """
+
 # pyright: reportPrivateUsage=false
 # pyright: reportUnknownMemberType=false
 # pyright: reportUnknownVariableType=false

@@ -1,10 +1,11 @@
 """Test image_colors module."""
 
 from cluster_colors import image_colors
-from cluster_colors.paths import TEST_DIR
 from cluster_colors.cluster_supercluster import DivisiveSupercluster
+from cluster_colors.paths import TEST_DIR
 
-_TEST_IMAGE = TEST_DIR / 'sugar-shack-barnes.jpg'
+_TEST_IMAGE = TEST_DIR / "sugar-shack-barnes.jpg"
+
 
 class TestGetBiggestColor:
 
