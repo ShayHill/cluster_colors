@@ -18,7 +18,7 @@ from cluster_colors.cluster_member import Members
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
-    from cluster_colors.type_hints import FPArray, ProximityMatrix, Vector, Vectors
+    from cluster_colors.type_hints import FPArray, ProximityMatrix, Vector, VectorsLike
 
 
 def _construct_is_low(low: float, high: float) -> Callable[[float], bool]:
@@ -100,7 +100,7 @@ class Cluster:
 
     @classmethod
     def from_vectors(
-        cls, vectors: Vectors, pmatrix: ProximityMatrix | None = None
+        cls, vectors: VectorsLike, pmatrix: ProximityMatrix | None = None
     ) -> Cluster:
         """Create a Cluster instance from an iterable of colors.
 
@@ -116,7 +116,7 @@ class Cluster:
 
     @classmethod
     def from_stacked_vectors(
-        cls, stacked_vectors: Vectors, pmatrix: ProximityMatrix | None = None
+        cls, stacked_vectors: VectorsLike, pmatrix: ProximityMatrix | None = None
     ) -> Cluster:
         """Create a Cluster instance from an iterable of colors.
 
@@ -131,7 +131,7 @@ class Cluster:
         return cls(members)
 
     # ===========================================================================
-    #   Vector-like properties
+    #   vector-like properties
     # ===========================================================================
 
     @property
@@ -161,7 +161,7 @@ class Cluster:
         return np.append(vector, weight)
 
     # ===========================================================================
-    #   Cluster centers
+    #   cluster centers
     # ===========================================================================
 
     def _get_weighted_medoid(self, ixs: Iterable[int] | None = None) -> int:
@@ -174,6 +174,9 @@ class Cluster:
         ixs_ = self.ixs if ixs is None else np.array(list(ixs), dtype=np.int32)
         if len(ixs_) == 1:
             return int(ixs_[0])
+        pmatrix = self.members.weighted_pmatrix[np.ix_(ixs_, ixs_)]
+        return ixs_[np.argmin(pmatrix.sum(axis=1))]
+
         return int(ixs_[np.argmin(self.members.weighted_pmatrix[ixs_].sum(axis=1))])
 
     @functools.cached_property
@@ -253,11 +256,15 @@ class Cluster:
         eigenvalues, eigenvectors = self._np_linalg_eig
         return eigenvectors[:, np.argmax(eigenvalues)]
 
+    # ===========================================================================
+    #   quality metrics
+    # ===========================================================================
+
     @functools.cached_property
     def sum_error(self) -> float:
         """Get the sum of proximity errors of all members.
 
-        :return: sum of squared errors of all members
+        :return: sum of errors of all members
         """
         if len(self.ixs) == 1:
             return 0
@@ -267,6 +274,18 @@ class Cluster:
 
     @functools.cached_property
     def max_error(self) -> float:
+        """Get the max of proximity errors of all members.
+
+        :return: max of errors of all members
+        """
+        if len(self.ixs) == 1:
+            return 0
+        pmatrix = self.members.pmatrix
+        weights = pmatrix[self.weighted_medoid, self.ixs]
+        return float(np.max(weights))
+
+    @functools.cached_property
+    def span(self) -> float:
         """Get the maximum proximity error between any two members.
 
         :return: maximum squared error of all members
@@ -277,12 +296,35 @@ class Cluster:
         weights = pmatrix[np.ix_(self.ixs, self.ixs)]
         return float(np.max(weights))
 
-    def get_merge_max_error(self, other: Cluster) -> float:
+    @functools.cached_property
+    def impurity(self) -> float:
+        """Get the impurity of the cluster.
+
+        :return: impurity of the cluster
+
+        Impurity is the proportion of the cluster's sum_error to the weight of the
+        cluster.
+        """
+        if len(self.ixs) == 1:
+            return 0
+        if self.weight == 0:
+            return 0
+        return self.sum_error / self.weight
+
+    # ===========================================================================
+    #   examine merge candidates
+    # ===========================================================================
+
+    def get_merge_span(self, other: Cluster) -> float:
         """Get the complete linkage error of merging this cluster with another.
 
         :return: sum of squared errors of all members if merged with another cluster
         """
         return float(np.max(self.members.pmatrix[np.ix_(self.ixs, other.ixs)]))
+
+    # ===========================================================================
+    #   the only verb
+    # ===========================================================================
 
     def split(self) -> tuple[Cluster, Cluster]:
         """Split cluster into two clusters.

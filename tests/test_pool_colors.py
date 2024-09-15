@@ -50,6 +50,7 @@ class TestPoolColors:
 
     def test_robust_to_order_with_ties(self):
         """Order does not matter, even with ties."""
+        #TODO: fix this test
 
         def split_ten_times(vecs):
             clusters = DivisiveSupercluster.from_vectors(np.array(vecs))

@@ -15,7 +15,7 @@ from basic_colormath import get_sqeuclidean_matrix
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from cluster_colors.type_hints import FPArray, ProximityMatrix, Vectors, VectorsLike
+    from cluster_colors.type_hints import FPArray, ProximityMatrix, VectorsLike
 
 
 class Members:
@@ -87,7 +87,7 @@ class Members:
 
     @classmethod
     def from_vectors(
-        cls, vectors: Vectors, *, pmatrix: FPArray | None = None
+        cls, vectors: VectorsLike, *, pmatrix: FPArray | None = None
     ) -> Members:
         """Create a Members instance from stacked_vectors.
 
@@ -100,7 +100,7 @@ class Members:
 
     @classmethod
     def from_stacked_vectors(
-        cls, stacked_vectors: Vectors, *, pmatrix: FPArray | None = None
+        cls, stacked_vectors: VectorsLike, *, pmatrix: FPArray | None = None
     ) -> Members:
         """Create a Members instance from stacked_vectors.
 
@@ -110,6 +110,5 @@ class Members:
             with squared Euclidean distance
         :return: Members instance
         """
-        return cls(
-            stacked_vectors[:, :-1], weights=stacked_vectors[:, -1], pmatrix=pmatrix
-        )
+        vectors = np.asarray(stacked_vectors)
+        return cls(vectors[:, :-1], weights=vectors[:, -1], pmatrix=pmatrix)

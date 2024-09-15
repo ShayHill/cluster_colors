@@ -33,7 +33,7 @@ class TestKMedians:
     def test_get_rsorted_clusters(self, colors: ColorsArray):
         """Test that the clusters are sorted by the number of colors in them"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
-        clusters.set_min_proximity(16 ** 2)
+        clusters.set_n(16)
         _ = clusters.as_stacked_vectors
 
     def test_split_to_n(self, colors: ColorsArray):
@@ -44,10 +44,56 @@ class TestKMedians:
     def test_get_rsorted_exemplars(self, colors: ColorsArray):
         """Test that the clusters are sorted by the number of colors in them"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
-        clusters.set_min_proximity(16 ** 2)
+        clusters.set_n(16)
         _ = clusters.as_vectors
 
     def test_merge_to_n(self, colors: ColorsArray):
         clusters = AgglomerativeSupercluster.from_stacked_vectors(colors)
         clusters.set_n(10)
         assert clusters.as_stacked_vectors.shape == (10, 4)
+
+class TestPredicates:
+    def test_set_max_sum_error(self, colors: ColorsArray):
+        """Split as far as necessary to get below the threshold"""
+        clusters = DivisiveSupercluster.from_stacked_vectors(colors)
+        for _ in range(10):
+            clusters.split()
+        max_sum_error = 48000
+        clusters.set_max_sum_error(max_sum_error)
+        assert clusters.get_max_sum_error() <= max_sum_error
+        clusters.merge()
+        assert clusters.get_max_sum_error() > max_sum_error
+
+    def test_set_max_span(self, colors: ColorsArray):
+        """Split as far as necessary to get below the threshold"""
+        clusters = DivisiveSupercluster.from_stacked_vectors(colors)
+        for _ in range(10):
+            clusters.split()
+        max_span = 2400
+        clusters.set_max_span(max_span)
+        assert clusters.get_max_span() <= max_span
+        clusters.merge()
+        assert clusters.get_max_span() > max_span
+
+    def test_set_max_max_error(self, colors: ColorsArray):
+        """Split as far as necessary to get below the threshold"""
+        clusters = DivisiveSupercluster.from_stacked_vectors(colors)
+        for _ in range(10):
+            clusters.split()
+        max_max_error = 1200
+        clusters.set_max_max_error(max_max_error)
+        assert clusters.get_max_max_error() <= max_max_error
+        clusters.merge()
+        assert clusters.get_max_max_error() > max_max_error
+
+    def test_set_max_impurity(self, colors: ColorsArray):
+        """Split as far as necessary to get below the threshold"""
+        clusters = DivisiveSupercluster.from_stacked_vectors(colors)
+        for _ in range(10):
+            clusters.split()
+        max_impurity = .5
+        clusters.set_max_impurity(max_impurity)
+        assert clusters.get_max_impurity() <= max_impurity
+        clusters.merge()
+        assert clusters.get_max_impurity() > max_impurity
+

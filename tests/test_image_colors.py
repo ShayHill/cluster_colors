@@ -14,4 +14,4 @@ class TestGetBiggestColor:
         colors = image_colors.stack_image_colors(_TEST_IMAGE)
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(2)
-        _ = clusters.set_min_proximity(quarter_colorspace_se)
+        _ = clusters.set_max_max_error(quarter_colorspace_se)

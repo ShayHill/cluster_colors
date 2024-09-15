@@ -22,9 +22,8 @@ _RGB = tuple[float, float, float]
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
 
-    from cluster_colors.type_hints import FPArray, ProximityMatrix, Vectors
+    from cluster_colors.type_hints import FPArray, ProximityMatrix, Vectors, VectorsLike
 
 
 class FailedToSplitError(Exception):
@@ -103,7 +102,7 @@ class _Supercluster(ABC):
     @classmethod
     def from_vectors(
         cls: type[_SuperclusterT],
-        vectors: Vectors,
+        vectors: VectorsLike,
         pmatrix: ProximityMatrix | None = None,
     ) -> _SuperclusterT:
         """Create a new Supercluster instance from stacked vectors.
@@ -119,7 +118,7 @@ class _Supercluster(ABC):
     @classmethod
     def from_stacked_vectors(
         cls: type[_SuperclusterT],
-        stacked_vectors: Vectors,
+        stacked_vectors: VectorsLike,
         pmatrix: ProximityMatrix | None = None,
     ) -> _SuperclusterT:
         """Create a new Supercluster instance from stacked vectors.
@@ -242,7 +241,7 @@ class _Supercluster(ABC):
         These will be the clusters (multiple if tie, which should be rare) with the
         highest sse.
         """
-        return max(self.clusters, key=lambda c: c.sum_error)
+        return max(self.clusters, key=lambda c: c.span)
 
     def _get_next_to_merge(self) -> tuple[Cluster, Cluster]:
         """Return the next set of clusters to merge.
@@ -254,7 +253,7 @@ class _Supercluster(ABC):
         lowest sse.
         """
         pairs = it.combinations(self.clusters, 2)
-        return min(pairs, key=lambda p: p[0].get_merge_max_error(p[1]))
+        return min(pairs, key=lambda p: p[0].get_merge_span(p[1]))
 
     # ===========================================================================
     #   perform splits and merges
@@ -319,46 +318,85 @@ class _Supercluster(ABC):
             raise FailedToMergeError
         self._merge_to_n(self.n - 1)
 
-    def split_amrap(self, predicate: Callable[[_Supercluster], bool]) -> None:
-        """Split as many reps as possible before the predicate is False.
+    def get_max_sum_error(self) -> float:
+        """Return the maximum sum of errors of any cluster."""
+        return max(c.span for c in self.clusters)
 
-        :param predicate: function that takes a Supercluster instance and returns a
-            boolean. It is critical that this predicate returns true when
-            self.n == 1
+    def set_max_sum_error(self, max_sum_error: float):
+        """Split as far as necessary to get below the threshold.
 
-        Split until the predicate is False, then back up one step. If the predicate
-        is False when starting, back up to a state where the predicate is True. If
-        all clusters are singletons, and the predicate is still True, the
-        Supercluster instance will be left in an "atomized" (one member per cluster)
-        state.
+        :param min_proximity: maximum sum of errors of any cluster
         """
-        with suppress(FailedToSplitError):
-            while predicate(self):
-                self.split()
+
+        def predicate() -> bool:
+            return self.get_max_sum_error() > max_sum_error
+
         with suppress(FailedToMergeError):
-            while not predicate(self):
+            while not predicate():
                 self.merge()
+        with suppress(FailedToSplitError):
+            while predicate():
+                self.split()
 
-    def get_min_proximity(self) -> float:
-        """Return the minimum intercluster proximity."""
-        if self.n == 1:
-            return 0
-        ixs = [c.weighted_medoid for c in self.clusters]
-        pmat = self.members.pmatrix_with_inf_diagonal
-        return float(np.min(pmat[np.ix_(ixs, ixs)]))
+    def get_max_span(self) -> float:
+        """Return the minimum maximum cost of any cluster."""
+        return max(c.span for c in self.clusters)
 
-    def set_min_proximity(self, min_proximity: float):
-        """Split as far as possible while maintaining a minimum inter-cluster span.
+    def set_max_span(self, max_span: float):
+        """Split as far as necessary to get below the threshold.
 
-        Split until the condition is broken, then back up one step. If the condition
-        is broken at the start, back up all the way to a 1-cluster state before
-        splitting.
+        :param min_max_error: maximum span of any cluster
         """
 
-        def predicate(supercluster: _Supercluster) -> bool:
-            return supercluster.get_min_proximity() < min_proximity
+        def predicate() -> bool:
+            return self.get_max_span() < max_span
 
-        self.split_amrap(predicate)
+        with suppress(FailedToMergeError):
+            while predicate():
+                self.merge()
+        with suppress(FailedToSplitError):
+            while not predicate():
+                self.split()
+
+    def get_max_max_error(self) -> float:
+        """Return the maximum max_error of any cluster."""
+        return max(c.max_error for c in self.clusters)
+
+    def set_max_max_error(self, max_max_error: float):
+        """Split as far as necessary to get below the threshold.
+
+        :param min_max_error: maximum max_error of any cluster
+        """
+
+        def predicate() -> bool:
+            return self.get_max_max_error() > max_max_error
+
+        with suppress(FailedToMergeError):
+            while not predicate():
+                self.merge()
+        with suppress(FailedToSplitError):
+            while predicate():
+                self.split()
+
+    def get_max_impurity(self) -> float:
+        """Return the maximum impurity of any cluster."""
+        return max(c.impurity for c in self.clusters)
+
+    def set_max_impurity(self, max_impurity: float):
+        """Split as far as necessary to get below the threshold.
+
+        :param max_impurity: maximum impurity of any cluster
+        """
+
+        def predicate() -> bool:
+            return self.get_max_impurity() > max_impurity
+
+        with suppress(FailedToMergeError):
+            while not predicate():
+                self.merge()
+        with suppress(FailedToSplitError):
+            while predicate():
+                self.split()
 
     def _reassign(self, _previous_medoids: set[tuple[int, ...]] | None = None):
         """Reassign members based on proximity to cluster medoids.

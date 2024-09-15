@@ -88,7 +88,7 @@ def get_biggest_color(stacked_colors: Vectors) -> tuple[float, ...]:
     """
     quarter_colorspace_se = 64**2
     clusters = DivisiveSupercluster.from_stacked_vectors(stacked_colors)
-    clusters.set_min_proximity(quarter_colorspace_se)
+    clusters.set_max_max_error(quarter_colorspace_se)
     return clusters.as_vectors[0]
 
 
