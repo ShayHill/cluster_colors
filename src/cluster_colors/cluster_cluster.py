@@ -72,7 +72,7 @@ def _split_floats(floats: Iterable[float]) -> int:
 
 
 class Cluster:
-    """A cluster of indices to self.members.vectors"""
+    """A cluster of indices to self.members.vectors."""
 
     def __init__(self, members: Members, ixs: Iterable[int] | None = None) -> None:
         """Identify a cluster by the indices of its members.
