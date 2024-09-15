@@ -59,14 +59,14 @@ class TestCluster:
         supercluster = DivisiveSupercluster.from_stacked_vectors(vectors)
         for _ in range(5):
             supercluster.split()
-        plot_2d_clusters(tuple(supercluster.clusters.keys()))
+        plot_2d_clusters(supercluster.clusters)
 
     def test_plot_2d_clusters_agglomerative(self) -> None:
         """Display clusters as a scatter plot."""
         vectors = np.random.rand(150, 3) * 100
         supercluster = AgglomerativeSupercluster.from_stacked_vectors(vectors)
         supercluster.set_n(5)
-        plot_2d_clusters(tuple(supercluster.clusters.keys()))
+        plot_2d_clusters(supercluster.clusters)
 
 def plot_2d_clusters(clusters: Iterable[Cluster]) -> None:
     """Display clusters as a scatter plot.

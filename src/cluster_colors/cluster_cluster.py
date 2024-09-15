@@ -72,22 +72,7 @@ def _split_floats(floats: Iterable[float]) -> int:
 
 
 class Cluster:
-    """A cluster of Member instances.
-
-    :param members: Member instances
-
-    Hold Members in a set. It is important for convergence that the exemplar is not
-    updated each time a member is added or removed. Add members from other clusters
-    to queue_add and self members to queue_sub. Do not update the members or
-    process_queue until each cluster's members have be offered to all other clusters.
-
-    When all clusters that should be moved have been inserted into queues, call
-    process_queue and, if changes have occurred, create a new Cluster instance for
-    the next round.
-
-    This is almost a frozen class, but the queue_add, queue_sub, and exemplar_age
-    attributes are intended to be mutable.
-    """
+    """A cluster of indices to self.members.vectors"""
 
     def __init__(self, members: Members, ixs: Iterable[int] | None = None) -> None:
         """Identify a cluster by the indices of its members.

@@ -96,7 +96,7 @@ class SuperclusterBase(ABC):
         self._cache_current_state()
 
     @abstractmethod
-    def _initialize_clusters(self) -> dict[Cluster, None]:
+    def _initialize_clusters(self) -> list[Cluster]:
         """Create clusters from the members."""
         ...
 
@@ -209,15 +209,10 @@ class SuperclusterBase(ABC):
         Retains shared clusters between the current state and cached state to
         preserve cached values and relative values of cluster serial numbers.
         """
-        state_list = list(state)
-        for cluster in tuple(self.clusters):
-            ixs = tuple(cluster.ixs)
-            if ixs in state:
-                state_list.remove(ixs)
-            else:
-                del self.clusters[cluster]
-        for ixs in state_list:
-            self.clusters[Cluster(self.members, ixs)] = None
+        current_state = tuple(tuple(c.ixs) for c in self.clusters)
+        new_state = [x for x in state if x not in current_state]
+        self.clusters = [c for c in self.clusters if tuple(c.ixs) in state]
+        self.clusters.extend([Cluster(self.members, x) for x in new_state])
 
     def _restore_state_to_n(self, n: int) -> None:
         """Restore the Supercluster instance to n clusters.
@@ -284,8 +279,8 @@ class SuperclusterBase(ABC):
         self._restore_state_as_close_as_possible_to_n(n)
         while self.n < n:
             cluster = self._get_next_to_split()
-            del self.clusters[cluster]
-            self.clusters.update({c: None for c in cluster.split()})
+            self.clusters.remove(cluster)
+            self.clusters.extend(cluster.split())
             self._reassign()
             self._cache_current_state()
 
@@ -296,12 +291,11 @@ class SuperclusterBase(ABC):
         """
         self._restore_state_as_close_as_possible_to_n(n)
         while self.n > n:
-            cluster_a, cluster_b = self._get_next_to_merge()
-            merged_ixs = np.concatenate((cluster_a.ixs, cluster_b.ixs))
+            pair_to_merge = self._get_next_to_merge()
+            merged_ixs = np.concatenate([x.ixs for x in pair_to_merge])
             merged = Cluster(self.members, merged_ixs)
-            del self.clusters[cluster_a]
-            del self.clusters[cluster_b]
-            self.clusters[merged] = None
+            self.clusters = [c for c in self.clusters if c not in pair_to_merge]
+            self.clusters.append(merged)
 
     # ===========================================================================
     #   public methods
@@ -448,8 +442,8 @@ class SuperclusterBase(ABC):
             new_where = np.argwhere(which_medoid == i)
             new = list(map(int, new_where.flatten()))
             if new != list(cluster.ixs):
-                del self.clusters[cluster]
-                self.clusters[Cluster(self.members, new)] = None
+                self.clusters.remove(cluster)
+                self.clusters.append(Cluster(self.members, new))
 
         with suppress(RecursionError):
             self._reassign(previous_states)
@@ -458,12 +452,12 @@ class SuperclusterBase(ABC):
 class DivisiveSupercluster(SuperclusterBase):
     """A set of Cluster instances for divisive clustering."""
 
-    def _initialize_clusters(self) -> dict[Cluster, None]:
-        return {Cluster(self.members): None}
+    def _initialize_clusters(self) -> list[Cluster]:
+        return [Cluster(self.members)]
 
 
 class AgglomerativeSupercluster(SuperclusterBase):
     """A set of Cluster instances for agglomerative clustering."""
 
-    def _initialize_clusters(self) -> dict[Cluster, None]:
-        return {Cluster(self.members, [i]): None for i in range(len(self.members))}
+    def _initialize_clusters(self) -> list[Cluster]:
+        return [Cluster(self.members, [i]) for i in range(len(self.members))]

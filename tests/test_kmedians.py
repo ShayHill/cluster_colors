@@ -16,16 +16,17 @@ import numpy as np
 import numpy.typing as npt
 import pytest
 
-from cluster_colors.vector_stacker import stack_vectors
 from cluster_colors.clusters import AgglomerativeSupercluster, DivisiveSupercluster
+from cluster_colors.vector_stacker import stack_vectors
 
 ColorsArray = Annotated[npt.NDArray[np.float64], (-1, 3)]
+
 
 @pytest.fixture(
     scope="function",
     params=[np.random.randint(0, 255, (100, 4), dtype=np.uint8) for _ in range(10)],
 )
-def colors(request) -> ColorsArray:
+def colors(request: pytest.FixtureRequest) -> ColorsArray:
     return stack_vectors(request.param)
 
 
@@ -51,6 +52,7 @@ class TestKMedians:
         clusters = AgglomerativeSupercluster.from_stacked_vectors(colors[:24])
         clusters.set_n(10)
         assert clusters.get_as_stacked_vectors().shape == (10, 4)
+
 
 class TestPredicates:
     def test_set_max_sum_error(self, colors: ColorsArray):
@@ -91,9 +93,8 @@ class TestPredicates:
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         for _ in range(10):
             clusters.split()
-        max_impurity = .5
+        max_impurity = 0.5
         clusters.set_max_impurity(max_impurity)
         assert clusters.get_max_impurity() <= max_impurity
         clusters.merge()
         assert clusters.get_max_impurity() > max_impurity
-
