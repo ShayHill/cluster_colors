@@ -22,8 +22,13 @@ _RGB = tuple[float, float, float]
 
 
 if TYPE_CHECKING:
-
-    from cluster_colors.type_hints import FPArray, ProximityMatrix, Vectors, VectorsLike
+    from cluster_colors.type_hints import (
+        CenterName,
+        FPArray,
+        ProximityMatrix,
+        Vectors,
+        VectorsLike,
+    )
 
 
 class FailedToSplitError(Exception):
@@ -140,16 +145,28 @@ class _Supercluster(ABC):
         """Return the number of clusters in the Supercluster instance."""
         return len(self.clusters)
 
-    @property
-    def as_stacked_vectors(self) -> Vectors:
-        """Return the members as a numpy array, sorted heaviest to lightest."""
-        as_stacked_vectors = np.array([c.as_stacked_vector for c in self.clusters])
+    def get_as_stacked_vectors(self, which_center: CenterName | None = None) -> Vectors:
+        """Return the members as a numpy array, sorted heaviest to lightest.
+
+        :param which_center: optionally specify a cluster center attribute. Choices
+            are 'weighted_median', 'weighted_medoid', or 'unweighted_medoid'. Default
+            is 'weighted_median'.
+        :return as_stacked_vectors: members as a numpy array (n, m+1) with the last
+            column as the weight.
+        """
+        as_stacked_vectors = np.array(
+            [c.get_as_stacked_vector(which_center) for c in self.clusters]
+        )
         return as_stacked_vectors[np.argsort(as_stacked_vectors[:, -1])][::-1]
 
-    @property
-    def as_vectors(self) -> FPArray:
-        """Return the members as a numpy array, sorted heaviest to lightest."""
-        return self.as_stacked_vectors[:, :-1]
+    def get_as_vectors(self, which_center: CenterName | None = None) -> FPArray:
+        """Return the members as a numpy array, sorted heaviest to lightest.
+
+        :param which_center: optionally specify a cluster center attribute. Choices
+            are 'weighted_median', 'weighted_medoid', or 'unweighted_medoid'. Default
+            is 'weighted_median'.
+        """
+        return self.get_as_stacked_vectors(which_center)[:, :-1]
 
     # ===========================================================================
     #   cacheing and state management

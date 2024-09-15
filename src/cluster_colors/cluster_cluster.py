@@ -11,6 +11,7 @@ import itertools
 from typing import TYPE_CHECKING
 
 import numpy as np
+from paragraphs import par
 from stacked_quantile import get_stacked_medians
 
 from cluster_colors.cluster_member import Members
@@ -18,7 +19,13 @@ from cluster_colors.cluster_member import Members
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
-    from cluster_colors.type_hints import FPArray, ProximityMatrix, Vector, VectorsLike
+    from cluster_colors.type_hints import (
+        CenterName,
+        FPArray,
+        ProximityMatrix,
+        Vector,
+        VectorsLike,
+    )
 
 
 def _construct_is_low(low: float, high: float) -> Callable[[float], bool]:
@@ -142,21 +149,36 @@ class Cluster:
         """
         return sum(self.members.weights[self.ixs])
 
-    @property
-    def as_vector(self) -> Vector:
+    def get_as_vector(self, which_center: CenterName | None = None) -> Vector:
         """Get the exemplar as a vector.
 
-        :return: weighted median as a vector
+        :param which_center: optionally specify a cluster center attribute. Choices
+            are 'weighted_median', 'weighted_medoid', or 'unweighted_medoid'. Default
+            is 'weighted_median'.
+        :return: cluster center as a vector
         """
-        return self.weighted_median
+        which_center = which_center or "weighted_median"
+        if which_center == "weighted_median":
+            return self.weighted_median
+        if which_center == "weighted_medoid":
+            return self.members.vectors[self.weighted_medoid]
+        if which_center == "unweighted_medoid":
+            return self.members.vectors[self.unweighted_medoid]
+        msg = par(
+            f"""center_name must be 'weighted_median', 'weighted_medoid', or
+            'unweighted_medoid', but got {which_center}"""
+        )
+        raise ValueError(msg)
 
-    @property
-    def as_stacked_vector(self) -> Vector:
+    def get_as_stacked_vector(self, which_center: CenterName | None = None) -> Vector:
         """Get the exemplar as a stacked vector.
 
         :return: [*weighted_median, weight] as a stacked vector
+        :param which_center: optionally specify a cluster center attribute. Choices
+            are 'weighted_median', 'weighted_medoid', or 'unweighted_medoid'. Default
+            is 'weighted_median'.
         """
-        vector = self.as_vector
+        vector = self.get_as_vector(which_center)
         weight = sum(self.members.weights[self.ixs])
         return np.append(vector, weight)
 

@@ -14,4 +14,4 @@ class TestSupercluster:
         """Test the as_one_cluster method."""
         members = Members.from_stacked_vectors(np.random.rand(6, 4))
         clusters = DivisiveSupercluster(members)
-        assert len(clusters.as_stacked_vectors) == 1
+        assert len(clusters.get_as_stacked_vectors()) == 1

@@ -34,23 +34,23 @@ class TestKMedians:
         """Test that the clusters are sorted by the number of colors in them"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(16)
-        _ = clusters.as_stacked_vectors
+        _ = clusters.get_as_stacked_vectors()
 
     def test_split_to_n(self, colors: ColorsArray):
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(10)
-        assert clusters.as_stacked_vectors.shape == (10, 4)
+        assert clusters.get_as_stacked_vectors().shape == (10, 4)
 
     def test_get_rsorted_exemplars(self, colors: ColorsArray):
         """Test that the clusters are sorted by the number of colors in them"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(16)
-        _ = clusters.as_vectors
+        assert clusters.get_as_vectors().shape == (16, 3)
 
     def test_merge_to_n(self, colors: ColorsArray):
         clusters = AgglomerativeSupercluster.from_stacked_vectors(colors)
         clusters.set_n(10)
-        assert clusters.as_stacked_vectors.shape == (10, 4)
+        assert clusters.get_as_stacked_vectors().shape == (10, 4)
 
 class TestPredicates:
     def test_set_max_sum_error(self, colors: ColorsArray):

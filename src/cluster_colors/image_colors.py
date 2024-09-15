@@ -89,7 +89,7 @@ def get_biggest_color(stacked_colors: Vectors) -> tuple[float, ...]:
     quarter_colorspace_se = 64**2
     clusters = DivisiveSupercluster.from_stacked_vectors(stacked_colors)
     clusters.set_max_max_error(quarter_colorspace_se)
-    return clusters.as_vectors[0]
+    return clusters.get_as_vectors()[0]
 
 
 def get_image_clusters(
@@ -128,7 +128,7 @@ def show_clusters(supercluster: DivisiveSupercluster, filename_stem: str) -> Non
     for cluster in supercluster.clusters:
         stripe_width = max(round(cluster.weight / sum_weight * width), 1)
         stripes.append(
-            np.tile(cluster.as_vector, (800, stripe_width))
+            np.tile(cluster.get_as_vector(), (800, stripe_width))
             .reshape(800, stripe_width, 3)
             .astype(np.uint8)
         )

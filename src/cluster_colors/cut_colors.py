@@ -81,4 +81,4 @@ def cut_colors(colors: Vectors, num: int) -> Vectors:
         if len(clusters) == len_clusters:
             break
 
-    return np.array([c.as_stacked_vector for c in clusters])
+    return np.array([c.get_as_stacked_vector() for c in clusters])

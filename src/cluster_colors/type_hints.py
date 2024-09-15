@@ -31,5 +31,8 @@ VectorsLike: TypeAlias = Sequence[Sequence[float]] | Vectors
 
 ProximityMatrix: TypeAlias = Annotated[FPArray, "(n, n)"]
 
+# Names of available centers
+CenterName = Literal["weighted_medoid", "unweighted_medoid", "weighted_median"]
+
 # number of bits in a color channel
 NBits = Literal[1, 2, 3, 4, 5, 6, 7, 8]
