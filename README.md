@@ -5,7 +5,7 @@ Processing and clustering colors from images presents some challenges:
 * Even a small (800x600) image will have up to 480,000 colors.
 * Solutions like PIL's `Image.quantize`, on the other hand, make the colors sample *too* coarse.
 * Even after reducing color variety, you're still dealing with 480,000 color *instances*.
-* Solution like `scikit-learn`'s `KMeans` handle some of these challenges, but are non-deterministic and not flexible in the ways that I'd like.
+* Solutions like `scikit-learn`'s `KMeans` handle some of these challenges, but are non-deterministic and not flexible in the ways that I'd like.
 
 ## I provide three steps here:
 
