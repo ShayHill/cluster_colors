@@ -14,7 +14,7 @@ import numpy as np
 from paragraphs import par
 from stacked_quantile import get_stacked_medians
 
-from cluster_colors.cluster_member import Members
+from cluster_colors.cluster_members import Members
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable

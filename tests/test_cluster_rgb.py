@@ -10,10 +10,10 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 # pyright: reportPrivateUsage=false
-from cluster_colors.cluster_member import Members
-from cluster_colors.clusters import Cluster
+from cluster_colors.cluster_members import Members
+from cluster_colors.cluster_supercluster import Cluster, SuperclusterBase
 from cluster_colors.vector_stacker import  stack_vectors
-from cluster_colors.clusters import DivisiveSupercluster,  AgglomerativeSupercluster
+from cluster_colors.cluster_supercluster import DivisiveSupercluster,  AgglomerativeSupercluster
 
 
 
@@ -55,29 +55,36 @@ class TestCluster:
 
     def test_plot_2d_clusters(self) -> None:
         """Display clusters as a scatter plot."""
-        vectors = np.random.rand(150, 3) * 100
+        vectors = np.random.rand(150, 3) * 255
         supercluster = DivisiveSupercluster.from_stacked_vectors(vectors)
-        for _ in range(5):
+        for _ in range(4):
             supercluster.split()
-        plot_2d_clusters(supercluster.clusters)
+        plot_2d_clusters(supercluster)
 
     def test_plot_2d_clusters_agglomerative(self) -> None:
         """Display clusters as a scatter plot."""
-        vectors = np.random.rand(150, 3) * 100
+        vectors = np.random.rand(150, 3) * 255
         supercluster = AgglomerativeSupercluster.from_stacked_vectors(vectors)
         supercluster.set_n(5)
-        plot_2d_clusters(supercluster.clusters)
+        plot_2d_clusters(supercluster)
 
-def plot_2d_clusters(clusters: Iterable[Cluster]) -> None:
+def plot_2d_clusters(supercluster: SuperclusterBase) -> None:
     """Display clusters as a scatter plot.
 
     :param supercluster: list of sets of (x, y) coordinates
 
     Make each cluster a different color.
     """
-    return
-    colors = plt.cm.rainbow(np.linspace(0, 1, len(clusters)))  # type: ignore
-    colors = stack_vectors(colors)  # type: ignore
+    clusters = supercluster.clusters
+    # colors = plt.cm.rainbow(np.linspace(0, 1, len(clusters)))
+    # colors2 = stack_vectors(colors)
+
+    clusters = sorted(clusters, key=lambda c: c.weight)[::-1]
+    colors = np.zeros((len(clusters), 4))
+    colors[:, 3] = 1
+    colors[:, :2] = supercluster.get_as_vectors() / 255
+    colors[:, 2] = 1 - np.max(colors[:, :2], axis=1)
+
     for cluster, color in zip(clusters, colors):
         points = cluster.members.vectors[cluster.ixs]
         exemplar = cluster.get_as_vector("unweighted_medoid")

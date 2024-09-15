@@ -4,8 +4,8 @@
 :created: 2023-04-12
 """
 
-from cluster_colors.clusters import Cluster, DivisiveSupercluster
-from cluster_colors.cluster_member import Members
+from cluster_colors.cluster_supercluster import Cluster, DivisiveSupercluster
+from cluster_colors.cluster_members import Members
 import numpy as np
 
 

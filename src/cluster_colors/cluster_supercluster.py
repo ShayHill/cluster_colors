@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, TypeVar
 import numpy as np
 
 from cluster_colors.cluster_cluster import Cluster
-from cluster_colors.cluster_member import Members
+from cluster_colors.cluster_members import Members
 
 _CachedState = tuple[tuple[int, ...], ...]
 

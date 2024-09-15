@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from PIL import Image
 
-from cluster_colors.clusters import DivisiveSupercluster, SuperclusterBase
+from cluster_colors.cluster_supercluster import DivisiveSupercluster, SuperclusterBase
 from cluster_colors.config import CACHE_DIR
 from cluster_colors.cut_colors import cut_colors
 from cluster_colors.paths import BINARIES_DIR

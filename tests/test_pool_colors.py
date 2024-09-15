@@ -17,7 +17,7 @@ import numpy as np
 from PIL import Image
 
 from cluster_colors import pool_colors
-from cluster_colors.clusters import DivisiveSupercluster
+from cluster_colors.cluster_supercluster import DivisiveSupercluster
 from cluster_colors.paths import TEST_DIR
 from cluster_colors.vector_stacker import stack_vectors
 

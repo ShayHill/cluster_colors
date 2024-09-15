@@ -2,7 +2,7 @@
 
 from cluster_colors import image_colors
 from cluster_colors.paths import TEST_DIR
-from cluster_colors.clusters import DivisiveSupercluster
+from cluster_colors.cluster_supercluster import DivisiveSupercluster
 
 _TEST_IMAGE = TEST_DIR / 'sugar-shack-barnes.jpg'
 

@@ -16,7 +16,7 @@ import numpy as np
 import numpy.typing as npt
 import pytest
 
-from cluster_colors.clusters import AgglomerativeSupercluster, DivisiveSupercluster
+from cluster_colors.cluster_supercluster import AgglomerativeSupercluster, DivisiveSupercluster
 from cluster_colors.vector_stacker import stack_vectors
 
 ColorsArray = Annotated[npt.NDArray[np.float64], (-1, 3)]
