@@ -1,44 +1,39 @@
-Divisive (but not hierarchical) clustering.
+# Cluster Colors (or other vectors)
 
-Slow, but clustering exactly how I want it. Iteratively split cluster with highest SSE. Splits are used to find new exemplars, which are thrown into k-medians with existing exemplars. Takes pretty extreme measures to avoid not only non-determinism but also non-arbitrary-ism:
+Processing and clustering colors from images presents some challenges:
 
-* a Supercluster instance, when asked to split, will split the cluster with the highest SSE. If there is a tie, the Clusters instance will not arbitrarily decide between the tied clusters, but will instead split all clusters tied for max SSE. This means there is a small chance you will not be able to split a group of colors into exactly n clusters.
-* delta-e is non-commutative, so delta-e is computed *twice* for each distance (a -> b and b -> a). The maximum of these two is used. This doubles the time of an already slow calculation, but delta-e is only used for distances between clusters, and this module is designed to work with small numbers of clusters (Agglomerative clustering may be a better bet if you want to use small clusters.)
+* Even a small (800x600) image will have up to 480,000 colors.
+* Solutions like PIL's `Image.quantize`, on the other hand, make the colors sample *too* coarse.
+* Even after reducing color variety, you're still dealing with 480,000 color *instances*.
+* Solution like `scikit-learn`'s `KMeans` handle some of these challenges, but are non-deterministic and not flexible in the ways that I'd like.
 
-Advantages:
-* finds big clusters
-* deterministic and non-arbitrary
-* robust to outliers
-* fast for what it is, can easily split a few thousand members into a small number of clusters
-* decisions made early on do not effect the result as much as they would in true hierarchical clustering
-* has strategies to avoid ties or arbitrary (even if deterministic) decisions with small member sets. This is important when dealing with questions like "which of these five colors is most unlike the others?"
+## I provide three steps here:
 
-Disadvantages:
-* child clusters will not necessarily contain (or only contain) the members of the parent, so this is not hierarchical, though you can "merge" split clusters by regressing to previous states.
-* sloooows down as the number of clusters grows, not the best way to de-cluster all the way back to constituent members.
-* uses Euclidean distance (sum squared error) for many steps. Delta e is used for final splitting criteria.
+### Pool colors
 
-This clustering is designed for questions like "what are the five dominant colors in this image (respecting transparency)?"
+Average similar colors. Specifically, this maps an 8-bit color space to an n-bit color space then averages colors in each bin. An argument, `nbits`, specifies the number of bits to use for each color channel. The default is 6, which reduces 17-million-ish possible colors to 300-thousand-ish possible colors. The downside is that the boundaries between n-bit bins are arbitrary. Heavy concentrations of near-identical colors will be split if a boundary passes through them.
 
-## Three large steps in the background
+Pooling colors from an image path will write a cache to your temp directory.
 
-### Average colors by n-bit representation
+### Cut  colors
 
-`pool_colors`: reduce 8-bit image colors (potentially 16_777_216 colors) to a maximum of 262_144 by averaging. The ouput of `pool_colors` will also contain a weight axis for each color, representing the combined opacity of all pixels of that color.
+Reduce the number of colors by recursively splitting the color space along the longest axis. This is a median cut algorithm, but it's not constrained to x, y, or z axes. The longest axis is determined by the standard deviation of the colors in the cluster. I've made the cut just a little bit smarter than standard median cut, but this is essentially k-medoids without the re-distribution step, so it's more efficient, but not the best we can do. An argument, `num`, specifies the number of colors to reduce to. 512 is a good number, but if you're still missing some nuance, you can increase it.
 
-### Median cut along longest axis
+### Divisive and Agglomerative clustering
 
-`cut_colors`: reduce colors to around 512 by recursively splitting along longest axis (longest actual axis. Not constrained to x, y, or, z axes).
+* Both are deterministic.
+* Both handle frequency, weight, transparency.
+* Both allow a user-defined proximity matrix, so you can use whatever delta function you like as long as `delta(a,a)` is 0 and `delta(a,b)` is never 0. Common choices are Euclidean, squared Euclidean, and delta-e.
+* Divisive uses a variation of *k-medoids*.
+* Agglomerative uses *complete linkage*.
+* Divisive is more robust to outliers and will give more even-sized clusters.
+* Divisive child clusters will not necessarily contain (or only contain) the members of the parent.
+* Agglomerative is more likely to separate outliers.
+* Agglomerative is heirarchical.
 
-### k-medians clustering
+Divisive clustering is typically better for, "What are the five dominant colors in this image?"
 
-`KMedSupercluster`: split and merge (undo split) clusters.
-
-* start with one cluster with 100 members
-* split this cluster recursively into five clusters (30, 30, 20, 10, 10)
-* ask for the largest cluster, and there's a tie
-* KMedSupercluster will recursively unsplit clusters until all ties are broken. This will *rarely* be needed.
-
+Agglomerative clustering is typically better for, "How many colors do I need to represent this image with no more than `delta==3` between any two cluster members?"
 
 ## Installation
 
@@ -49,13 +44,11 @@ This clustering is designed for questions like "what are the five dominant color
 ~~~python
 from cluster_colors import get_image_clusters
 
-clusters = get_image_clusters(image_filename) # one cluster at this point
-clusters.split_to_delta_e(16)
-split_clusters = clusters.get_rsorted_clusters()
-
-colors: list[tuple[float, float, float]] = [c.exemplar for c in split_clusters]
+# find the five most dominant colors in an image
+clusters = get_image_clusters(image_filename)
+clusters.split_to_n(5)
+exemplars = clusters.get_as_vectors()
 
 # to save the cluster exemplars as an image file
-
 show_clusters(split_clusters, "open_file_to_see_clusters")
 ~~~
