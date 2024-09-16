@@ -82,7 +82,7 @@ class SuperclusterBase(ABC):
         :param members: Members instance
         """
         self.members = members
-        self.clusters = self._initialize_clusters()
+        self.clusters: list[Cluster] = self._initialize_clusters()
         self._cached_states: list[_CachedState] = []
         self._cache_current_state()
 
@@ -131,6 +131,35 @@ class SuperclusterBase(ABC):
         """
         members = Members.from_stacked_vectors(stacked_vectors, pmatrix=pmatrix)
         return cls(members)
+
+    @classmethod
+    def from_cluster_subset(cls, *clusters: Cluster) -> SuperclusterBase:
+        """Create a SuperclusterBase instance from a subset of clusters.
+
+        :param clusters: any number of clusters sharing the same members
+        :return: SuperclusterBase instance with members from the subset
+
+        Create a new SuperclusterBase instance from any number of clusters sharing
+        the same Members instance. These clusters will presumably be a subset of the
+        clusters from another SuperclusterBase instance.
+
+        This filters the shared proximity matrix of the clusters to avoid calculating
+        it again. The input clustering will be discarded, and the returned
+        SuperclusterBase instance will in a 1-cluster or all-singletons state,
+        depending on how _initialize_clusters is implemented.
+        """
+        shared_members = clusters[0].members
+        if not all(c.members is shared_members for c in clusters[1:]):
+            msg = "All clusters must share the same Members instance."
+            raise ValueError(msg)
+        ixs = sorted(int(x) for c in clusters for x in c.ixs)
+        if len(ixs) != len(set(ixs)):
+            msg = "Input clusters share member indices."
+            raise ValueError(msg)
+        subset_vectors = shared_members.vectors[ixs]
+        subset_pmatrix = shared_members.pmatrix[np.ix_(ixs, ixs)]
+        subset_members = Members(subset_vectors, pmatrix=subset_pmatrix)
+        return cls(subset_members)
 
     # ===========================================================================
     #   properties

@@ -56,6 +56,15 @@ class TestKMedians:
         clusters.set_n(10)
         assert clusters.get_as_stacked_vectors().shape == (10, 4)
 
+    def test_from_cluster_subset(self, colors: ColorsArray):
+        clusters = DivisiveSupercluster.from_vectors(colors)
+        clusters.set_n(8)
+        subset = DivisiveSupercluster.from_cluster_subset(*clusters.clusters[:4])
+        subset_cnt = sum(len(c.ixs) for c in clusters.clusters[:4])
+        assert subset.members.vectors.shape == (subset_cnt, 3)
+        assert subset.members.weights.shape == (subset_cnt,)
+        assert subset.members.pmatrix.shape == (subset_cnt, subset_cnt)
+
 
 class TestPredicates:
     def test_set_max_sum_error(self, colors: ColorsArray):
