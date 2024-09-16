@@ -34,6 +34,7 @@ import numpy as np
 
 from cluster_colors.cluster_cluster import Cluster
 from cluster_colors.cluster_members import Members
+from cluster_colors.exceptions import FailedToMergeError, FailedToSplitError
 
 _CachedState = tuple[tuple[int, ...], ...]
 
@@ -50,26 +51,6 @@ if TYPE_CHECKING:
         Vectors,
         VectorsLike,
     )
-
-
-class FailedToSplitError(Exception):
-    """Exception raised when no clusters can be split."""
-
-    def __init__(self, message: str | None = None) -> None:
-        """Create a new AllClustersAreSingletonsError instance."""
-        message_ = message or "Cannot split any cluster. All clusters are singletons."
-        self.message = message_
-        super().__init__(self.message)
-
-
-class FailedToMergeError(Exception):
-    """Exception raised when no clusters can be merged."""
-
-    def __init__(self, message: str | None = None) -> None:
-        """Create a new CannotMergeSingleCluster instance."""
-        message_ = message or "Cannot merge any cluster. All members in one cluster."
-        self.message = message_
-        super().__init__(self.message)
 
 
 _SuperclusterT = TypeVar("_SuperclusterT", bound="SuperclusterBase")
@@ -276,10 +257,14 @@ class SuperclusterBase(ABC):
 
         :return: set of clusters with sse == max(sse)
         :raise ValueError: if no clusters are available to split
+
+        Avoid picking singletons, which can tie for max_error == 0 with larger
+        clusters if the larger clusters have 0-weight members.
+
+        This function should never be called if all clusters are singletons, a
+        FailedToSplitError should be raised before that happens.
         """
-        candidates = [c for c in self.clusters if len(c.ixs) > 1]
-        if not candidates:
-            raise FailedToSplitError
+        candidates = (c for c in self.clusters if len(c.ixs) > 1)
         return max(candidates, key=lambda c: c.sum_error)
 
     def _get_next_to_merge(self) -> tuple[Cluster, Cluster]:
@@ -303,7 +288,10 @@ class SuperclusterBase(ABC):
         :param n: number of clusters
         """
         self._restore_state_as_close_as_possible_to_n(n)
+
         while self.n < n:
+            if self.n == len(self.members):
+                raise FailedToSplitError
             cluster = self._get_next_to_split()
             self.clusters.remove(cluster)
             self.clusters.extend(cluster.split())
@@ -317,6 +305,8 @@ class SuperclusterBase(ABC):
         """
         self._restore_state_as_close_as_possible_to_n(n)
         while self.n > n:
+            if self.n == 1:
+                raise FailedToMergeError
             pair_to_merge = self._get_next_to_merge()
             merged_ixs = np.concatenate([x.ixs for x in pair_to_merge])
             merged = Cluster(self.members, merged_ixs)
@@ -341,8 +331,6 @@ class SuperclusterBase(ABC):
         This sets the state of the Supercluster instance. If the state is already
         >=n, nothing happens.
         """
-        if len(self.clusters) == len(self.members):
-            raise FailedToSplitError
         self._split_to_n(self.n + 1)
 
     def merge(self):
@@ -351,8 +339,6 @@ class SuperclusterBase(ABC):
         This sets the state of the Supercluster instance. If the state is already
         <=n, nothing happens.
         """
-        if len(self.clusters) == 1:
-            raise FailedToMergeError
         self._merge_to_n(self.n - 1)
 
     # ===========================================================================
