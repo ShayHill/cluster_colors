@@ -72,7 +72,7 @@ class Members:
         if pmatrix is None:
             self.pmatrix = get_sqeuclidean_matrix(self.vectors)
         else:
-            self.pmatrix = pmatrix[sort_indices, sort_indices]
+            self.pmatrix = pmatrix[np.ix_(sort_indices, sort_indices)]
 
     def __len__(self) -> int:
         """Number of members in the Members instance.
