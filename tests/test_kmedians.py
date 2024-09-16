@@ -100,13 +100,13 @@ class TestPredicates:
         clusters.merge()
         assert clusters.get_max_max_error() > max_max_error
 
-    def test_set_max_impurity(self, colors: ColorsArray):
+    def test_set_avg_error(self, colors: ColorsArray):
         """Split as far as necessary to get below the threshold"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         for _ in range(10):
             clusters.split()
-        max_impurity = 0.5
-        clusters.set_max_impurity(max_impurity)
-        assert clusters.get_max_impurity() <= max_impurity
+        max_avg_error = 0.5
+        clusters.set_max_avg_error(max_avg_error)
+        assert clusters.get_max_avg_error() <= max_avg_error
         clusters.merge()
-        assert clusters.get_max_impurity() > max_impurity
+        assert clusters.get_max_avg_error() > max_avg_error

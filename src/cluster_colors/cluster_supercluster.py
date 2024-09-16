@@ -41,6 +41,8 @@ _RGB = tuple[float, float, float]
 
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from cluster_colors.type_hints import (
         CenterName,
         FPArray,
@@ -357,11 +359,31 @@ class SuperclusterBase(ABC):
     #   split or merge to satisfy a condition
     #
     #   For every condition defined here, the condition will be satisfied when a
-    #   one-cluster state or all-singletons state is reached (as appropriate), but
-    #   other conditions may be patched in that to do satisfy this. In those
-    #   instances, the splitting or merging will silenty give up when the minimum or
-    #   maximum number of clusters is reached.
+    #   one-cluster state is reached (if not before), but other conditions may be
+    #   passed in that to do satisfy this. In those instances, the splitting or
+    #   merging will silenty give up when the minimum or maximum number of clusters
+    #   is reached.
     # ===========================================================================
+
+    def split_till_true(self, predicate: Callable[[SuperclusterBase], bool]) -> None:
+        """Split clusters till predicate is True.
+
+        :param predicate: function that takes a SuperclusterBase and returns a
+            boolean. Presumably, if the predicate is True, a quality metric is good.
+            If False, that metric is bad.
+
+        If the predicate is True at the current state, merge till it is False, then
+        split back to the first True. This will put the SuperclusterInstance into a
+        state where the predicate is True, but one merge would make it False.
+
+        This is for predicates that improve as the number of clusters increases.
+        """
+        with suppress(FailedToMergeError):
+            while predicate(self):
+                self.merge()
+        with suppress(FailedToSplitError):
+            while not predicate(self):
+                self.split()
 
     def get_max_sum_error(self) -> float:
         """Return the maximum sum of errors of any cluster."""
@@ -373,15 +395,10 @@ class SuperclusterBase(ABC):
         :param min_proximity: maximum sum of errors of any cluster
         """
 
-        def predicate() -> bool:
-            return self.get_max_sum_error() > max_sum_error
+        def predicate(supercluster: SuperclusterBase) -> bool:
+            return supercluster.get_max_sum_error() <= max_sum_error
 
-        with suppress(FailedToMergeError):
-            while not predicate():
-                self.merge()
-        with suppress(FailedToSplitError):
-            while predicate():
-                self.split()
+        self.split_till_true(predicate)
 
     def get_max_span(self) -> float:
         """Return the minimum maximum cost of any cluster."""
@@ -393,15 +410,10 @@ class SuperclusterBase(ABC):
         :param min_max_error: maximum span of any cluster
         """
 
-        def predicate() -> bool:
-            return self.get_max_span() < max_span
+        def predicate(supercluster: SuperclusterBase) -> bool:
+            return supercluster.get_max_span() <= max_span
 
-        with suppress(FailedToMergeError):
-            while predicate():
-                self.merge()
-        with suppress(FailedToSplitError):
-            while not predicate():
-                self.split()
+        self.split_till_true(predicate)
 
     def get_max_max_error(self) -> float:
         """Return the maximum max_error of any cluster."""
@@ -413,35 +425,25 @@ class SuperclusterBase(ABC):
         :param min_max_error: maximum max_error of any cluster
         """
 
-        def predicate() -> bool:
-            return self.get_max_max_error() > max_max_error
+        def predicate(supercluster: SuperclusterBase) -> bool:
+            return supercluster.get_max_max_error() <= max_max_error
 
-        with suppress(FailedToMergeError):
-            while not predicate():
-                self.merge()
-        with suppress(FailedToSplitError):
-            while predicate():
-                self.split()
+        self.split_till_true(predicate)
 
-    def get_max_impurity(self) -> float:
-        """Return the maximum impurity of any cluster."""
+    def get_max_avg_error(self) -> float:
+        """Return the maximum avg_error of any cluster."""
         return max(c.avg_error for c in self.clusters)
 
-    def set_max_impurity(self, max_impurity: float):
+    def set_max_avg_error(self, max_avg_error: float):
         """Split as far as necessary to get below the threshold.
 
-        :param max_impurity: maximum impurity of any cluster
+        :param max_avg_error: maximum avg_error of any cluster
         """
 
-        def predicate() -> bool:
-            return self.get_max_impurity() > max_impurity
+        def predicate(supercluster: SuperclusterBase) -> bool:
+            return supercluster.get_max_avg_error() <= max_avg_error
 
-        with suppress(FailedToMergeError):
-            while not predicate():
-                self.merge()
-        with suppress(FailedToSplitError):
-            while predicate():
-                self.split()
+        self.split_till_true(predicate)
 
     # ===========================================================================
     #   the reassignment step for divisive clustering
