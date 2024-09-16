@@ -147,6 +147,19 @@ class Cluster:
         """
         return sum(self.members.weights[self.ixs])
 
+    @property
+    def error_weight(self) -> float:
+        """Total weight of members that are not the center.
+
+        :return: total weight of members that are not the center
+
+        This is for use in various metrics one might use for selecting clusters to
+        split or join.
+        """
+        if len(self.ixs) == 1:
+            return 0
+        return self.weight - self.members.weights[self.weighted_medoid]
+
     def get_as_vector(self, which_center: CenterName | None = None) -> Vector:
         """Get the exemplar as a vector.
 
@@ -326,21 +339,17 @@ class Cluster:
         return float(np.max(weights))
 
     @functools.cached_property
-    def impurity(self) -> float:
-        """Get the impurity of the cluster.
+    def avg_error(self) -> float:
+        """Get the average error of the cluster members.
 
-        :return: impurity of the cluster
+        :return: max_error / error_weight
 
-        Impurity is the proportion of the cluster's sum_error to the weight of the
-        cluster. This metric is useful for splitting clusters with meaningful
-        outliers, where sum_error might split heavy clusters, even when the members
-        are close.
+        This metric is useful for splitting clusters with meaningful outliers, where
+        sum_error might split heavy clusters, even when the members are close.
         """
-        if len(self.ixs) == 1:
+        if self.error_weight == 0:
             return 0
-        if self.weight == 0:
-            return 0
-        return self.sum_error / self.weight
+        return self.sum_error / self.error_weight
 
     # ===========================================================================
     #   examine merge candidates

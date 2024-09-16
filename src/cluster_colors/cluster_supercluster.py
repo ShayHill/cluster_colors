@@ -275,7 +275,10 @@ class SuperclusterBase(ABC):
         :return: set of clusters with sse == max(sse)
         :raise ValueError: if no clusters are available to split
         """
-        return max(self.clusters, key=lambda c: c.sum_error)
+        candidates = [c for c in self.clusters if len(c.ixs) > 1]
+        if not candidates:
+            raise FailedToSplitError
+        return max(candidates, key=lambda c: c.sum_error)
 
     def _get_next_to_merge(self) -> tuple[Cluster, Cluster]:
         """Return the next set of clusters to merge.
@@ -283,6 +286,8 @@ class SuperclusterBase(ABC):
         :return: set of clusters with sse == min(sse)
         :raise ValueError: if no clusters are available to merge
         """
+        if len(self.clusters) == 1:
+            raise FailedToMergeError
         pairs = it.combinations(self.clusters, 2)
         return min(pairs, key=lambda p: p[0].get_merge_span(p[1]))
 
@@ -420,7 +425,7 @@ class SuperclusterBase(ABC):
 
     def get_max_impurity(self) -> float:
         """Return the maximum impurity of any cluster."""
-        return max(c.impurity for c in self.clusters)
+        return max(c.avg_error for c in self.clusters)
 
     def set_max_impurity(self, max_impurity: float):
         """Split as far as necessary to get below the threshold.
