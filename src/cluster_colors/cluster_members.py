@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from basic_colormath import get_sqeuclidean_matrix
+from paragraphs import par
 
 from cluster_colors.vector_stacker import add_weight_axis, stack_vectors
 
@@ -43,6 +44,7 @@ class Members:
         :param weights: optional array (n,) of weights
         :param pmatrix: optional proximity matrix. If not given, will be calculated
             with squared Euclidean distance
+        :raises ValueError: if input vectors and pmatrix do not align after stacking
 
         The `weights` argument is optional, but each member must have a weight. If
         `weights` is None, the weights are assumed to be the last axis of the vectors
@@ -54,6 +56,13 @@ class Members:
         The vectors must be sorted in case any members has equal proximity to
         multiple centers. When this happens, the centroid with the lowest
         lexigraphical order is chosen.
+
+        Init will sort input vectors and sort any proximity matrix passed to align to
+        the sorted vectors.
+
+        Init will also stack vectors to remove any duplicates, but *cannot* update an
+        input pmatrix to match. If you pass identical vectors and a pmatrix, you will
+        get a ValueError.
         """
         self._stacked_vectors = np.asarray(vectors)
 
@@ -65,9 +74,19 @@ class Members:
             weights = np.asarray(list(weights)).reshape(-1, 1)
             self._stacked_vectors = np.hstack((self._stacked_vectors, weights))
 
+        # sort input vectors
         sort_indices = np.lexsort(self._stacked_vectors.T[::-1])
         self._stacked_vectors = self._stacked_vectors[sort_indices]
-        self._stacked_vectors = stack_vectors(self._stacked_vectors)
+
+        # stack input vectors to remove duplicates
+        ensure_stacked = stack_vectors(self._stacked_vectors)
+        if self._stacked_vectors.shape != ensure_stacked.shape and pmatrix is not None:
+            msg = par(
+                """Input pmatrix shape does not conform to input vectors after
+                stacking duplicates."""
+            )
+            raise ValueError(msg)
+        self._stacked_vectors = ensure_stacked
 
         if pmatrix is None:
             self.pmatrix = get_sqeuclidean_matrix(self.vectors)
