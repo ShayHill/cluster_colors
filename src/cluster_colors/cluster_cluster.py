@@ -3,8 +3,7 @@
 Each Cluster instance holds a Members instance and a list of indices to vectors in
 that instance. Clusters have multiple errors and centers defined for various
 purposes, including two centroids, weighted and unweighted medoid, used within the
-clustering algorithm. See the docstrings for why and where each centroid is used, but
-this is a deviation from strict k-medoids.
+clustering algorithm.
 
 :author: Shay Hill
 :created: 2024-09-03

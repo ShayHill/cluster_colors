@@ -24,7 +24,7 @@ Reduce the number of colors by recursively splitting the color space along the l
 * Both are deterministic.
 * Both handle frequency, weight, transparency.
 * Both allow a user-defined proximity matrix, so you can use whatever delta function you like as long as `delta(a,a)` is 0 and `delta(a,b)` is never 0. Common choices are Euclidean, squared Euclidean, and delta-e.
-* Divisive uses a variation of *k-medoids*.
+* Divisive uses a variation of median cut followed by a kmediods-like reassignment step to conversion.
 * Agglomerative uses *complete linkage*.
 * Divisive is more robust to outliers and will give more even-sized clusters.
 * Divisive child clusters will not necessarily contain (or only contain) the members of the parent.

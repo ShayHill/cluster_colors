@@ -489,10 +489,6 @@ class SuperclusterBase:
         Recursively redistribute members between clusters until no member can be
         moved to a different cluster to reduce the total error.
 
-        Convergence uses the cluster medoid, not the cluster exemplar. This allows
-        the clusters a bit more mobility, so the separation of two heavy,
-        nearly-identical clusters is not destiny.
-
         A record of previous states prevents infinite recursion between a few states.
         It is conceivable that conversion could fail in other cases. The recursion
         limit is set to the Python's recursion limit.
