@@ -26,11 +26,11 @@ to return either a single cluster or a cluster for each member.
 from __future__ import annotations
 
 import itertools as it
-from abc import ABC, abstractmethod
 from contextlib import suppress
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Literal, TypeVar
 
 import numpy as np
+from paragraphs import par
 
 from cluster_colors.cluster_cluster import Cluster
 from cluster_colors.cluster_members import Members
@@ -46,8 +46,10 @@ if TYPE_CHECKING:
 
     from cluster_colors.type_hints import (
         CenterName,
+        CentroidName,
         FPArray,
         ProximityMatrix,
+        QualityMetric,
         Vectors,
         VectorsLike,
     )
@@ -56,8 +58,33 @@ if TYPE_CHECKING:
 _SuperclusterT = TypeVar("_SuperclusterT", bound="SuperclusterBase")
 
 
-class SuperclusterBase(ABC):
-    """A list of Cluster instances."""
+class SuperclusterBase:
+    """A list of Cluster instances.
+
+    quality_metric: The property used to select which cluster to split. This is
+        meaningles for agglomerative clustering. There is no such class attribute for
+        merge quality, because I have only implemented one merge-quality metric:
+        span.
+        Literal["sum_error", "max_error", "avg_error", "span"]
+
+    quality_centroid: The property used as a centroid when computing the quality
+        metric.
+        Literal["weighted_medoid", "unweighted_medoid"]
+
+    assignment_centroid: The property used as a centroid when assigning members to a
+        cluster. This may be different from the quality centroid, as SuperclusterBase
+        deviates from k-medoids by splitting a cluster by median cut instead of by
+        randomly selecting exemplars from the cluster.
+        Literal["weighted_medoid", "unweighted_medoid"]
+
+    clustering_method: The method used to split or merge clusters.
+        Literal["divisive", "agglomerative"]
+    """
+
+    quality_metric: QualityMetric = "sum_error"
+    quality_centroid: CentroidName = "weighted_medoid"
+    assignment_centroid: CentroidName = "weighted_medoid"
+    clustering_method: Literal["divisive", "agglomerative"] = "divisive"
 
     def __init__(self, members: Members) -> None:
         """Create a new Supercluster instance.
@@ -65,14 +92,32 @@ class SuperclusterBase(ABC):
         :param members: Members instance
         """
         self.members = members
+
+        class _Cluster(Cluster):
+            quality_metric = self.quality_metric
+            quality_centroid = self.quality_centroid
+
+        self.cluster_type = _Cluster
+
         self.clusters: list[Cluster] = self._initialize_clusters()
         self._cached_states: list[_CachedState] = []
         self._cache_current_state()
 
-    @abstractmethod
     def _initialize_clusters(self) -> list[Cluster]:
         """Create clusters from the members."""
-        ...
+        match self.clustering_method:
+            case "divisive":
+                return [self.cluster_type(self.members, range(len(self.members)))]
+            case "agglomerative":
+                return [
+                    self.cluster_type(self.members, [i])
+                    for i in range(len(self.members))
+                ]
+        msg = par(
+            f"""SuperclusterBase class attribute `clustering_type` must be 'divisive'
+            or 'agglomerative', not {self.clustering_type}."""
+        )
+        raise ValueError(msg)
 
     # ===========================================================================
     #   constructors
@@ -220,7 +265,7 @@ class SuperclusterBase(ABC):
         current_state = tuple(tuple(c.ixs) for c in self.clusters)
         new_state = [x for x in state if x not in current_state]
         self.clusters = [c for c in self.clusters if tuple(c.ixs) in state]
-        self.clusters.extend([Cluster(self.members, x) for x in new_state])
+        self.clusters.extend([self.cluster_type(self.members, x) for x in new_state])
 
     def _restore_state_to_n(self, n: int) -> None:
         """Restore the Supercluster instance to n clusters.
@@ -309,7 +354,7 @@ class SuperclusterBase(ABC):
                 raise FailedToMergeError
             pair_to_merge = self._get_next_to_merge()
             merged_ixs = np.concatenate([x.ixs for x in pair_to_merge])
-            merged = Cluster(self.members, merged_ixs)
+            merged = self.cluster_type(self.members, merged_ixs)
             self.clusters = [c for c in self.clusters if c not in pair_to_merge]
             self.clusters.append(merged)
 
@@ -469,21 +514,25 @@ class SuperclusterBase(ABC):
             new = list(map(int, new_where.flatten()))
             if new != list(cluster.ixs):
                 self.clusters.remove(cluster)
-                self.clusters.append(Cluster(self.members, new))
+                self.clusters.append(self.cluster_type(self.members, new))
 
         with suppress(RecursionError):
             self._reassign(previous_states)
 
 
 class DivisiveSupercluster(SuperclusterBase):
-    """A list of Cluster instances for divisive clustering."""
+    """A SuperclusterBase that uses divisive clustering."""
 
-    def _initialize_clusters(self) -> list[Cluster]:
-        return [Cluster(self.members)]
+    quality_metric: QualityMetric = "avg_error"
+    quality_centroid: CentroidName = "weighted_medoid"
+    assignment_centroid: CentroidName = "weighted_medoid"
+    clustering_method: Literal["divisive", "agglomerative"] = "divisive"
 
 
 class AgglomerativeSupercluster(SuperclusterBase):
-    """A list of Cluster instances for agglomerative clustering."""
+    """A SuperclusterBase that uses agglomerative clustering."""
 
-    def _initialize_clusters(self) -> list[Cluster]:
-        return [Cluster(self.members, [i]) for i in range(len(self.members))]
+    quality_metric: QualityMetric = "avg_error"
+    quality_centroid: CentroidName = "weighted_medoid"
+    assignment_centroid: CentroidName = "weighted_medoid"
+    clustering_method: Literal["divisive", "agglomerative"] = "divisive"

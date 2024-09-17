@@ -27,8 +27,10 @@ if TYPE_CHECKING:
 
     from cluster_colors.type_hints import (
         CenterName,
+        CentroidName,
         FPArray,
         ProximityMatrix,
+        QualityMetric,
         Vector,
         VectorsLike,
     )
@@ -84,7 +86,16 @@ def _split_floats(floats: Iterable[float]) -> int:
 
 
 class Cluster:
-    """A cluster of indices to self.members.vectors."""
+    """A cluster of indices to self.members.vectors.
+
+    quality_metric: The property used to select which cluster to split. This is
+        meaningles for agglomerative clustering.
+    quality_centroid: The property used as a centroid when computing the quality
+        metric.
+    """
+
+    quality_metric: QualityMetric = "sum_error"
+    quality_centroid: CentroidName = "weighted_medoid"
 
     def __init__(self, members: Members, ixs: Iterable[int] | None = None) -> None:
         """Identify a cluster by the indices of its members.
@@ -97,6 +108,26 @@ class Cluster:
             self.ixs = np.arange(len(self.members), dtype=np.int32)
         else:
             self.ixs = np.array(sorted(ixs), dtype=np.int32)
+
+    # ===========================================================================
+    #   parameter-based properties
+    # ===========================================================================
+
+    @property
+    def error(self) -> float:
+        """Get the value of the split metric.
+
+        :return: value of the split metric
+        """
+        return getattr(self, self.quality_metric)
+
+    @property
+    def centroid(self) -> int:
+        """Get the value of the error centroid.
+
+        :return: value of the error centroid
+        """
+        return getattr(self, self.quality_centroid)
 
     # ===========================================================================
     #   constructors
@@ -158,7 +189,7 @@ class Cluster:
         """
         if len(self.ixs) == 1:
             return 0
-        return self.weight - self.members.weights[self.weighted_medoid]
+        return self.weight - self.members.weights[self.centroid]
 
     def get_as_vector(self, which_center: CenterName | None = None) -> Vector:
         """Get the exemplar as a vector.
@@ -307,7 +338,7 @@ class Cluster:
         if len(self.ixs) == 1:
             return 0
         pmatrix = self.members.weighted_pmatrix
-        weights = pmatrix[self.weighted_medoid, self.ixs]
+        weights = pmatrix[self.centroid, self.ixs]
         return float(np.sum(weights))
 
     @functools.cached_property
@@ -323,7 +354,7 @@ class Cluster:
         if len(self.ixs) == 1:
             return 0
         pmatrix = self.members.pmatrix
-        weights = pmatrix[self.weighted_medoid, self.ixs]
+        weights = pmatrix[self.centroid, self.ixs]
         return float(np.max(weights))
 
     @functools.cached_property
