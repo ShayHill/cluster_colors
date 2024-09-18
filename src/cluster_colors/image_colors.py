@@ -10,12 +10,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
 from PIL import Image
 
-from cluster_colors.cluster_supercluster import DivisiveSupercluster, SuperclusterBase
+from cluster_colors.cluster_supercluster import SuperclusterBase
 from cluster_colors.config import CACHE_DIR
 from cluster_colors.cut_colors import cut_colors
 from cluster_colors.pool_colors import pool_colors
@@ -79,15 +79,20 @@ def stack_image_colors(
     return colors
 
 
+_SuperclusterT = TypeVar("_SuperclusterT", bound=SuperclusterBase)
+
+
 def get_image_clusters(
+    return_type: type[_SuperclusterT],
     filename: Path | str,
     num_colors: int = 512,
     pool_bits: NBits = 6,
     *,
     ignore_cache: bool = False,
-) -> DivisiveSupercluster:
+) -> _SuperclusterT:
     """Get all colors in an image as a single KMedSupercluster instance.
 
+    :param return_type: the type of SuperclusterBase to return.
     :param filename: the path to an image file
     :param num_colors: the number of colors to reduce to. The default of 512 will
         cluster quickly down to medium-sized clusters.
@@ -100,7 +105,7 @@ def get_image_clusters(
     stacked_colors = stack_image_colors(
         filename, num_colors, pool_bits, ignore_cache=ignore_cache
     )
-    return DivisiveSupercluster.from_stacked_vectors(stacked_colors)
+    return return_type.from_stacked_vectors(stacked_colors)
 
 
 def show_clusters(
