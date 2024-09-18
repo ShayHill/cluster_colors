@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -18,7 +19,6 @@ from PIL import Image
 from cluster_colors.cluster_supercluster import DivisiveSupercluster, SuperclusterBase
 from cluster_colors.config import CACHE_DIR
 from cluster_colors.cut_colors import cut_colors
-from cluster_colors.paths import BINARIES_DIR
 from cluster_colors.pool_colors import pool_colors
 from cluster_colors.vector_stacker import stack_vectors
 
@@ -102,11 +102,14 @@ def get_image_clusters(
     return DivisiveSupercluster.from_stacked_vectors(stacked_colors)
 
 
-def show_clusters(supercluster: SuperclusterBase, filename_stem: str) -> None:
+def show_clusters(
+    supercluster: SuperclusterBase, filename: str | os.PathLike[str]
+) -> None:
     """Create a png with the exemplar of each cluster.
 
     :param supercluster: the clusters to show
-    :param filename_stem: the filename stem to use for the output file
+    :param filename: the filename to use for the output file. The number of clusters
+        will be added as an infix.
     """
     width = 1000
     sum_weight = sum(supercluster.members.weights)
@@ -122,4 +125,8 @@ def show_clusters(supercluster: SuperclusterBase, filename_stem: str) -> None:
     image = np.concatenate(stripes, axis=1)
 
     image = Image.fromarray(image)
-    image.save(BINARIES_DIR / f"{filename_stem}-{len(supercluster.clusters)}.png")
+
+    output_path = Path(filename)
+    output_name = f"{output_path.stem}-{len(supercluster.clusters)}.png"
+
+    image.save(output_path.parent / output_name)
