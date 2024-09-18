@@ -46,7 +46,7 @@ def _split_largest_cluster(clusters: set[Cluster], num: int) -> set[Cluster]:
     if len(clusters) >= num:
         return clusters
 
-    next_split = max(clusters, key=lambda c: c.span)
+    next_split = max(clusters, key=lambda c: c.variance)
     if next_split.span == 0:
         return clusters
     clusters.remove(next_split)
