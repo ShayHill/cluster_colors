@@ -101,12 +101,19 @@ class Cluster:
 
         :param members: Members instance
         :param ixs: optional indices of members. If None, use all members.
+
+        Eigenvalues and eigenvectors are used for splitting clusters and determining
+        variance. These will not be needed if a cluster is will not be split based on
+        a proximity-matrix-bases quality metric.
         """
         self.members = members
         if ixs is None:
             self.ixs = np.arange(len(self.members), dtype=np.int32)
         else:
             self.ixs = np.array(sorted(ixs), dtype=np.int32)
+
+        self._eigenvalues: FPArray | None = None
+        self._eigenvectors: FPArray | None = None
 
     # ===========================================================================
     #   parameter-based properties
@@ -304,9 +311,8 @@ class Cluster:
         ws = np.ceil(self.members.weights)
         return np.cov(vs.T, fweights=ws)
 
-    @functools.cached_property
     def _np_linalg_eig(self) -> tuple[FPArray, FPArray]:
-        """Cache the value of np.linalg.eig on the covariance matrix of the cluster.
+        """Return the result of np.linalg.eig on the covariance matrix of the cluster.
 
         :return: tuple of eigenvalues and eigenvectors
         """
@@ -314,15 +320,33 @@ class Cluster:
         return np.real(eigenvalues), np.real(eigenvectors)
 
     @property
-    def _direction_of_highest_variance(self) -> FPArray:
+    def eigenvalues(self) -> FPArray:
+        """Get the eigenvalues of the covariance matrix.
+
+        :return: eigenvalues of the covariance matrix
+        """
+        if self._eigenvalues is None:
+            self._eigenvalues, self._eigenvectors = self._np_linalg_eig()
+        return self._eigenvalues
+
+    @property
+    def eigenvectors(self) -> FPArray:
+        """Get the eigenvectors of the covariance matrix.
+
+        :return: eigenvectors of the covariance matrix
+        """
+        if self._eigenvectors is None:
+            self._eigenvalues, self._eigenvectors = self._np_linalg_eig()
+        return self._eigenvectors
+
+    def _get_direction_of_highest_variance(self) -> FPArray:
         """Get the first Eigenvector of the covariance matrix.
 
         :return: first Eigenvector of the covariance matrix
 
         Return the normalized eigenvector with the largest eigenvalue.
         """
-        eigenvalues, eigenvectors = self._np_linalg_eig
-        return eigenvectors[:, np.argmax(eigenvalues)]
+        return self.eigenvectors[:, np.argmax(self.eigenvalues)]
 
     # ===========================================================================
     #   quality metrics
@@ -381,6 +405,17 @@ class Cluster:
             return 0
         return self.sum_error / self.error_weight
 
+    @functools.cached_property
+    def variance(self) -> float:
+        """Get the variance of the cluster.
+
+        :return: variance of the cluster
+
+        This metric does not require a proximity matrix, so can be used to cheaply
+        select a cluster for median cut.
+        """
+        return max(self.eigenvalues)
+
     # ===========================================================================
     #   examine merge candidates
     # ===========================================================================
@@ -411,7 +446,7 @@ class Cluster:
             b) exactly on the splitting plane.
         See stacked_quantile module for details, but that case is covered here.
         """
-        abc = self._direction_of_highest_variance
+        abc = self._get_direction_of_highest_variance()
         vecs = self.members.vectors
 
         def rel_dist(x: int) -> float:
