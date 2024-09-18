@@ -9,7 +9,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -23,6 +22,8 @@ from cluster_colors.pool_colors import pool_colors
 from cluster_colors.vector_stacker import stack_vectors
 
 if TYPE_CHECKING:
+    import os
+
     from numpy import typing as npt
 
     from cluster_colors.type_hints import NBits, Vectors
