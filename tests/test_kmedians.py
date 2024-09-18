@@ -57,7 +57,7 @@ class TestKMedians:
         assert clusters.get_as_stacked_vectors().shape == (10, 4)
 
     def test_from_cluster_subset(self, colors: ColorsArray):
-        clusters = DivisiveSupercluster.from_vectors(colors)
+        clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(8)
         subset = DivisiveSupercluster.from_cluster_subset(*clusters.clusters[:4])
         subset_cnt = sum(len(c.ixs) for c in clusters.clusters[:4])

@@ -185,8 +185,11 @@ class SuperclusterBase:
             msg = "Input clusters share member indices."
             raise ValueError(msg)
         subset_vectors = shared_members.vectors[ixs]
+        subset_weights = shared_members.weights[ixs]
         subset_pmatrix = shared_members.pmatrix[np.ix_(ixs, ixs)]
-        subset_members = Members(subset_vectors, pmatrix=subset_pmatrix)
+        subset_members = Members(
+            subset_vectors, weights=subset_weights, pmatrix=subset_pmatrix
+        )
         return cls(subset_members)
 
     # ===========================================================================
