@@ -177,12 +177,28 @@ class Cluster:
     # ===========================================================================
 
     @property
+    def vectors(self) -> FPArray:
+        """Get the vectors of the members.
+
+        :return: vectors of the members
+        """
+        return self.members.vectors[self.ixs]
+
+    @property
+    def weights(self) -> FPArray:
+        """Get the weights of the members.
+
+        :return: weights of the members
+        """
+        return self.members.weights[self.ixs]
+
+    @property
     def weight(self) -> float:
         """Total weight of members.
 
         :return: total weight of members
         """
-        return sum(self.members.weights[self.ixs])
+        return sum(self.weights)
 
     @property
     def error_weight(self) -> float:
@@ -306,13 +322,17 @@ class Cluster:
         """Get the covariance matrix of the cluster.
 
         :return: covariance matrix of the cluster
-        """
-        vs = self.members.vectors
-        ws = np.ceil(self.members.weights)
-        return np.cov(vs.T, fweights=ws)
 
-    def _np_linalg_eig(self) -> tuple[FPArray, FPArray]:
-        """Return the result of np.linalg.eig on the covariance matrix of the cluster.
+        If there is < 2 members with non-zero weight, the covariance matrix will be
+        invalid. In that case, return an unweighted covariance matrix.
+        """
+        covariance_matrix = np.cov(self.vectors.T, fweights=np.ceil(self.weights))
+        if not np.any(np.isnan(covariance_matrix)):
+            return covariance_matrix
+        return np.cov(self.vectors)
+
+    def _get_eigens(self) -> tuple[FPArray, FPArray]:
+        """Set the eigenvalues and eigenvectors of the covariance matrix.
 
         :return: tuple of eigenvalues and eigenvectors
         """
@@ -326,7 +346,7 @@ class Cluster:
         :return: eigenvalues of the covariance matrix
         """
         if self._eigenvalues is None:
-            self._eigenvalues, self._eigenvectors = self._np_linalg_eig()
+            self._eigenvalues, self._eigenvectors = self._get_eigens()
         return self._eigenvalues
 
     @property
@@ -336,7 +356,7 @@ class Cluster:
         :return: eigenvectors of the covariance matrix
         """
         if self._eigenvectors is None:
-            self._eigenvalues, self._eigenvectors = self._np_linalg_eig()
+            self._eigenvalues, self._eigenvectors = self._get_eigens()
         return self._eigenvectors
 
     def _get_direction_of_highest_variance(self) -> FPArray:
@@ -414,6 +434,8 @@ class Cluster:
         This metric does not require a proximity matrix, so can be used to cheaply
         select a cluster for median cut.
         """
+        if len(self.ixs) == 1:
+            return 0
         return max(self.eigenvalues)
 
     # ===========================================================================

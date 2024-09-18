@@ -19,7 +19,7 @@ from cluster_colors.cluster_cluster import Cluster
 from cluster_colors.type_hints import Vectors
 
 
-def _split_every_cluster(clusters: set[Cluster]) -> set[Cluster]:
+def _split_every_cluster(clusters: list[Cluster]) -> list[Cluster]:
     """Recursively split every cluster.
 
     :param clusters: A set of clusters.
@@ -28,16 +28,16 @@ def _split_every_cluster(clusters: set[Cluster]) -> set[Cluster]:
     Recursively split every cluster with no regard for error. Will only *not* split
     a cluster if it only has one member.
     """
-    splittable = {c for c in clusters if len(c.ixs) > 1}
+    splittable = [c for c in clusters if len(c.ixs) > 1]
     if not splittable:
         return clusters
     for cluster in splittable:
         clusters.remove(cluster)
-        clusters.update(cluster.split())
+        clusters.extend(cluster.split())
     return clusters
 
 
-def _split_largest_cluster(clusters: set[Cluster], num: int) -> set[Cluster]:
+def _split_largest_cluster(clusters: list[Cluster], num: int) -> list[Cluster]:
     """Split one cluster per call.
 
     :param clusters: A set of clusters.
@@ -46,11 +46,11 @@ def _split_largest_cluster(clusters: set[Cluster], num: int) -> set[Cluster]:
     if len(clusters) >= num:
         return clusters
 
-    next_split = max(clusters, key=lambda c: c.variance)
-    if next_split.span == 0:
+    split_ix, next_split = max(enumerate(clusters), key=lambda ix: ix[1].variance)
+    if next_split.variance == 0:
         return clusters
-    clusters.remove(next_split)
-    clusters.update(next_split.split())
+    clusters = clusters[:split_ix] + clusters[split_ix + 1 :]
+    clusters.extend(next_split.split())
     return clusters
 
 
@@ -71,7 +71,7 @@ def cut_colors(colors: Vectors, num: int) -> Vectors:
     if len(colors) <= num:
         return colors
 
-    clusters = {Cluster.from_stacked_vectors(colors)}
+    clusters = [Cluster.from_stacked_vectors(colors)]
     while len(clusters) < num // 4:
         clusters = _split_every_cluster(clusters)
 
