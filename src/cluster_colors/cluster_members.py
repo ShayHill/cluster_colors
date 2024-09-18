@@ -89,9 +89,9 @@ class Members:
         self._stacked_vectors = ensure_stacked
 
         if pmatrix is None:
-            self.pmatrix = get_sqeuclidean_matrix(self.vectors)
+            self._pmatrix = None
         else:
-            self.pmatrix = pmatrix[np.ix_(sort_indices, sort_indices)]
+            self._pmatrix = pmatrix[np.ix_(sort_indices, sort_indices)]
 
     def __len__(self) -> int:
         """Number of members in the Members instance.
@@ -99,6 +99,17 @@ class Members:
         :return: number of members
         """
         return len(self.vectors)
+
+    @property
+    def pmatrix(self) -> ProximityMatrix:
+        """Proximity matrix.
+
+        :return: proximity matrix such that pmatrix[i, j] is the cost of members[i] in
+            a cluster with members[j]
+        """
+        if self._pmatrix is None:
+            self._pmatrix = get_sqeuclidean_matrix(self.vectors)
+        return self._pmatrix
 
     @property
     def vectors(self) -> FPArray:
