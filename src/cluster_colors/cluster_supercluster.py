@@ -32,17 +32,12 @@ from typing import TYPE_CHECKING, Literal, TypeVar
 import numpy as np
 from paragraphs import par
 
+from cluster_colors import exceptions
 from cluster_colors.cluster_cluster import Cluster
 from cluster_colors.cluster_members import Members
-from cluster_colors.exceptions import FailedToMergeError, FailedToSplitError
-
-_CachedState = tuple[tuple[int, ...], ...]
-
-_RGB = tuple[float, float, float]
-
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterable
 
     from cluster_colors.type_hints import (
         CenterName,
@@ -50,10 +45,12 @@ if TYPE_CHECKING:
         FPArray,
         ProximityMatrix,
         QualityMetric,
+        VectorLike,
         Vectors,
         VectorsLike,
     )
 
+_CachedState = tuple[tuple[int, ...], ...]
 
 _SuperclusterT = TypeVar("_SuperclusterT", bound="SuperclusterBase")
 
@@ -86,12 +83,20 @@ class SuperclusterBase:
     assignment_centroid: CentroidName = "weighted_medoid"
     clustering_method: Literal["divisive", "agglomerative"] = "divisive"
 
-    def __init__(self, members: Members) -> None:
+    def __init__(self, members: Members, ixs: VectorLike | None = None) -> None:
         """Create a new Supercluster instance.
 
         :param members: Members instance
+        :param ixs: optional list of indices to use from the Members instance. This
+            can be used to create a subset of clusters from another Subcluster
+            instance using the same Members instance.
+        :raise EmptySuperclusterError: if ixs is empty
         """
         self.members = members
+        self.ixs = np.arange(len(members)) if ixs is None else np.array(sorted(ixs))
+
+        if self.ixs.shape[0] == 0:
+            raise exceptions.EmptySuperclusterError
 
         class _Cluster(Cluster):
             quality_metric = self.quality_metric
@@ -107,17 +112,22 @@ class SuperclusterBase:
         """Create clusters from the members."""
         match self.clustering_method:
             case "divisive":
-                return [self.cluster_type(self.members, range(len(self.members)))]
+                return [self.cluster_type(self.members, self.ixs)]
             case "agglomerative":
-                return [
-                    self.cluster_type(self.members, [i])
-                    for i in range(len(self.members))
-                ]
+                return [self.cluster_type(self.members, [i]) for i in self.ixs]
         msg = par(
             f"""SuperclusterBase class attribute `clustering_type` must be 'divisive'
             or 'agglomerative', not {self.clustering_type}."""
         )
         raise ValueError(msg)
+
+    # ===========================================================================
+    #   lookups
+    # ===========================================================================
+
+    def find_member(self, member_idx: int) -> int:
+        """Return an indes to the cluster that contains member_idx."""
+        return next(i for i, c in enumerate(self.clusters) if member_idx in c.ixs)
 
     # ===========================================================================
     #   constructors
@@ -160,37 +170,97 @@ class SuperclusterBase:
         members = Members.from_stacked_vectors(stacked_vectors, pmatrix=pmatrix)
         return cls(members)
 
-    @classmethod
-    def from_cluster_subset(cls, *clusters: Cluster) -> SuperclusterBase:
+    # ===============================================================================
+    #   filtered copies
+    # ===============================================================================
+
+    def copy(
+        self: _SuperclusterT,
+        *,
+        exclude_clusters: Iterable[int] = (),
+        exclude_member_clusters: Iterable[int] = (),
+        exclude_members: Iterable[int] = (),
+        reindex: bool = False,
+    ) -> _SuperclusterT:
         """Create a SuperclusterBase instance from a subset of clusters.
 
-        :param clusters: any number of clusters sharing the same members
-        :return: SuperclusterBase instance with members from the subset
+        :param exclude_clusters: indices of clusters to exclude from the subset
+        :param exclude_member_clusters: indices of members to exclude from the
+            subset. For each given member, the cluster that contains that member will
+            be excluded.
+        :param exclude_members: indices of members to exclude from the subset.
+        :param reindex: Optionally reindex the members of the subset.
+        :return: a new SuperclusterBase instance with members from the subset
 
-        Create a new SuperclusterBase instance from any number of clusters sharing
-        the same Members instance. These clusters will presumably be a subset of the
-        clusters from another SuperclusterBase instance.
+        If reindex=True, reindex the members of the subset. Filter members.vectors,
+        members.weights, and members.pmatrix. Self.ixs will be range(len(subset)).
+        This will preserve the calculations in the pmatrix, but will otherwise be as
+        if the superset had never existed.
 
-        This filters the shared proximity matrix of the clusters to avoid calculating
-        it again. The input clustering will be discarded, and the returned
-        SuperclusterBase instance will in a 1-cluster or all-singletons state,
-        depending on how _initialize_clusters is implemented.
+        If reindex=False (the default), do not reindex the members of the subset.
+        The number of member indices in the superset will be <= the length of the
+        members.vectors. Self.ixs will be sequential, but will have gaps. This will
+        carry around some extra data, but indices to the parent supercluster members
+        will be preserved.
         """
-        shared_members = clusters[0].members
-        if not all(c.members is shared_members for c in clusters[1:]):
-            msg = "All clusters must share the same Members instance."
-            raise ValueError(msg)
-        ixs = sorted(int(x) for c in clusters for x in c.ixs)
-        if len(ixs) != len(set(ixs)):
-            msg = "Input clusters share member indices."
-            raise ValueError(msg)
-        subset_vectors = shared_members.vectors[ixs]
-        subset_weights = shared_members.weights[ixs]
-        subset_pmatrix = shared_members.pmatrix[np.ix_(ixs, ixs)]
+        ixs_as_set = set(self.ixs)
+        exclude_clusters = set(exclude_clusters)
+        exclude_clusters.update(
+            self.find_member(m_i) for m_i in exclude_member_clusters
+        )
+        exclude_ixs = set(
+            it.chain(*[self.clusters[c_i].ixs for c_i in exclude_clusters])
+        )
+        exclude_ixs |= set(exclude_members)
+        ixs_as_set -= exclude_ixs
+        ixs = sorted(ixs_as_set)
+
+        if reindex is False:
+            return self.__class__(self.members, ixs)
+
+        subset_vectors = self.members.vectors[ixs]
+        subset_weights = self.members.weights[ixs]
+        subset_pmatrix = self.members.pmatrix[np.ix_(ixs, ixs)]
         subset_members = Members(
             subset_vectors, weights=subset_weights, pmatrix=subset_pmatrix
         )
-        return cls(subset_members)
+        return self.__class__(subset_members)
+
+    def without_clusters(
+        self: _SuperclusterT, *ixs: int, reindex: bool = False
+    ) -> _SuperclusterT:
+        """Remove clusters from the Supercluster instance.
+
+        :param ixs: indices of clusters to remove
+        :param reindex: Optionally reindex the members. This will preserve the
+            calculations in the pmatrix, but will otherwise be as if the members had
+            never existed.
+        """
+        return self.copy(exclude_clusters=ixs, reindex=reindex)
+
+    def without_member_clusters(
+        self: _SuperclusterT, *member_ixs: int, reindex: bool = False
+    ) -> _SuperclusterT:
+        """Remove clusters that contain the given members.
+
+        :param member_ixs: indices of members to remove
+        :param reindex: Optionally reindex the members. This will preserve the
+            calculations in the pmatrix, but will otherwise be as if the members had
+            never existed.
+        """
+        return self.copy(exclude_member_clusters=member_ixs, reindex=reindex)
+
+    def without_members(
+        self: _SuperclusterT, *ixs: int, reindex: bool = False
+    ) -> _SuperclusterT:
+        """Remove members from the Supercluster instance.
+
+        :param ixs: indices of members to remove
+        :param reindex: Optionally reindex the members. This will preserve the
+            calculations in the pmatrix, but will otherwise be as if the members had
+            never existed.
+        """
+        return self.copy(exclude_members=ixs, reindex=reindex)
 
     # ===========================================================================
     #   properties
@@ -322,7 +392,7 @@ class SuperclusterBase:
         :raise ValueError: if no clusters are available to merge
         """
         if len(self.clusters) == 1:
-            raise FailedToMergeError
+            raise exceptions.FailedToMergeError
         pairs = it.combinations(self.clusters, 2)
         return min(pairs, key=lambda p: p[0].get_merge_span(p[1]))
 
@@ -338,8 +408,8 @@ class SuperclusterBase:
         self._restore_state_as_close_as_possible_to_n(n)
 
         while self.n < n:
-            if self.n == len(self.members):
-                raise FailedToSplitError
+            if self.n == len(self.ixs):
+                raise exceptions.FailedToSplitError
             cluster = self._get_next_to_split()
             self.clusters.remove(cluster)
             self.clusters.extend(cluster.split())
@@ -354,7 +424,7 @@ class SuperclusterBase:
         self._restore_state_as_close_as_possible_to_n(n)
         while self.n > n:
             if self.n == 1:
-                raise FailedToMergeError
+                raise exceptions.FailedToMergeError
             pair_to_merge = self._get_next_to_merge()
             merged_ixs = np.concatenate([x.ixs for x in pair_to_merge])
             merged = self.cluster_type(self.members, merged_ixs)
@@ -412,10 +482,10 @@ class SuperclusterBase:
 
         This is for predicates that improve as the number of clusters increases.
         """
-        with suppress(FailedToMergeError):
+        with suppress(exceptions.FailedToMergeError):
             while predicate(self):
                 self.merge()
-        with suppress(FailedToSplitError):
+        with suppress(exceptions.FailedToSplitError):
             while not predicate(self):
                 self.split()
 
@@ -498,19 +568,21 @@ class SuperclusterBase:
 
         This will only ever be called for divisive clustering.
         """
-        medoids = [c.unweighted_medoid for c in self.clusters]
-
+        medoids = np.array([c.unweighted_medoid for c in self.clusters])
         previous_states = _previous_medoids or set()
         state = tuple(sorted(medoids))
         if state in previous_states:
             return
         previous_states.add(state)
 
-        which_medoid = np.argmin(self.members.pmatrix[medoids], axis=0)
+        which_medoid = np.argmin(
+            self.members.pmatrix[np.ix_(medoids, self.ixs)], axis=0
+        )
 
         for i, cluster in enumerate(tuple(self.clusters)):
             new_where = np.argwhere(which_medoid == i)
-            new = list(map(int, new_where.flatten()))
+            new_ixs = self.ixs[new_where.flatten()]
+            new = list(map(int, new_ixs))
             if new != list(cluster.ixs):
                 self.clusters.remove(cluster)
                 self.clusters.append(self.cluster_type(self.members, new))

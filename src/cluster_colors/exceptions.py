@@ -23,3 +23,13 @@ class FailedToMergeError(Exception):
         message_ = message or "Cannot merge any cluster. All members in one cluster."
         self.message = message_
         super().__init__(self.message)
+
+
+class EmptySuperclusterError(Exception):
+    """Exception raised when no clusters can be merged."""
+
+    def __init__(self, message: str | None = None) -> None:
+        """Create a new CannotMergeSingleCluster instance."""
+        message_ = message or "Supercluster requires at least one member index."
+        self.message = message_
+        super().__init__(self.message)
