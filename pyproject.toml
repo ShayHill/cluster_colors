@@ -1,6 +1,6 @@
 [project]
 name = "cluster_colors"
-version = "0.11.0"
+version = "0.12.0"
 description = "Cluster rgb vectors with divisive kmedians"
 authors = [{ name = "Shay Hill", email = "shay_public@hotmail.com" }]
 license = {text = "MIT"}
@@ -18,7 +18,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.11.0"
+version = "0.12.0"
 tag_format = "$version"
 major_version_zero = true
 version_files = ["pyproject.toml:^version"]
