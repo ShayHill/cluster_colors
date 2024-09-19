@@ -11,8 +11,8 @@ class TestGetBiggestColor:
 
     def test_display(self):
         """Test display_biggest_color function."""
-        colors = image_colors.stack_image_colors(_TEST_IMAGE)
+        colors = image_colors.stack_pool_cut_image_colors(_TEST_IMAGE)
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(2)
         clusters.set_max_max_error(64**2)
-        image_colors.show_clusters(clusters, BINARIES_DIR / _TEST_IMAGE.stem)
+        image_colors.show_color_supercluster(clusters, BINARIES_DIR / _TEST_IMAGE.stem)

@@ -1,4 +1,10 @@
-"""Create and use cluster images from image colors.
+"""Create and use cluster instances from image colors.
+
+Some functions will take an image filename, others will take an array of colors.
+Arrays of colors must be (r, g, b, w) where w is the weight of the color. When
+creating a color array from an image, the w value will be the pixel alpha. For an
+input image where every pixel is fully opaque, the w value, after stacking, will be
+proportionate to the number of pixels where an (r, g, b) color appears.
 
 :author: Shay Hill
 :created: 2022-11-07
@@ -26,67 +32,79 @@ if TYPE_CHECKING:
 
     from numpy import typing as npt
 
-    from cluster_colors.type_hints import NBits, Vectors
+    from cluster_colors.type_hints import CenterName, NBits, Vectors, VectorsLike
+
+_SuperclusterT = TypeVar("_SuperclusterT", bound=SuperclusterBase)
 
 
-def _stack_image_colors_no_cache(
-    filename: Path | str, num_colors: int = 512, pool_bits: NBits = 6
+def stack_pool_cut_colors(
+    colors: VectorsLike, num: int | None = None, pool_bits: NBits | None = None
 ) -> Vectors:
-    """Stack pixel colors and reduce the number of colors in an image.
+    """Reduce the number of colors to <= num by pooling and cutting.
 
-    :param filename: the path to an image file
-     :param num_colors: the number of colors to reduce to. The default of 512 will
-         cluster quickly down to medium-sized clusters.
-     :param pool_bits: the number of bits to pool colors by. The default of 6 is a
-     good value. You can probably just ignore this parameter, but it's here to
-         eliminate a "magic number" from the code.
-     :return: an array of colors with weights
+    :param colors: an array (m, 4) of weighted colors (r, g, b, w)
+    :param num: the number of colors to reduce to. Default is 512.
+    :param pool_bits: the number of bits to pool colors by. Default is 6. Leave it.
+    :return: an array of colors with weights
     """
-    img = Image.open(filename)
-    img = img.convert("RGBA")
-    colors = stack_vectors(np.array(img))
+    num = num or 512
+    pool_bits = pool_bits or 6
+    colors = stack_vectors(np.array(colors))
     colors = pool_colors(colors, pool_bits)
-    return cut_colors(colors, num_colors)
+    return cut_colors(colors, num)
 
 
-def stack_image_colors(
+def get_color_supercluster(
+    return_type: type[_SuperclusterT],
+    colors: VectorsLike,
+    num: int | None = None,
+    pool_bits: NBits | None = None,
+) -> _SuperclusterT:
+    """Create a SuperclusterBase instance from an array of colors.
+
+    :param colors: an array (m, 4) of weighted colors (r, g, b, w)
+    :param num: the number of colors to reduce to. Default is 512.
+    :param pool_bits: the number of bits to pool colors by. Default is 6. Leave it.
+    :return: a SuperclusterBase instance
+    """
+    colors = stack_pool_cut_colors(colors, num, pool_bits)
+    return return_type.from_stacked_vectors(colors)
+
+
+def stack_pool_cut_image_colors(
     filename: Path | str,
-    num_colors: int = 512,
-    pool_bits: NBits = 6,
+    num: int | None = None,
+    pool_bits: NBits | None = None,
     *,
     ignore_cache: bool = False,
 ) -> Vectors:
     """Load cache or stack pixel colors and reduce the number of colors in an image.
 
     :param filename: the path to an image file
-    :param num_colors: the number of colors to reduce to. The default of 512 will
-        cluster quickly down to medium-sized clusters.
-    :param pool_bits: the number of bits to pool colors by. The default of 6 is a
-    good value. You can probably just ignore this parameter, but it's here to
-        eliminate a "magic number" from the code.
+    :param num: the number of colors to reduce to. Default is 512.
+    :param pool_bits: the number of bits to pool colors by. Default is 6. Leave it.
     :param ignore_cache: if True, ignore any cached results and recompute the colors.
     :return: an array of colors with weights
 
     This is a pre-processing step for the color clustering. Stacking is necessary,
     and the pooling and cutting will allow clustering in a reasonable amount of time.
     """
-    cache_path = CACHE_DIR / f"{Path(filename).stem}_{num_colors}_{pool_bits}.npy"
+    cache_path = CACHE_DIR / f"{Path(filename).stem}_{num}_{pool_bits}.npy"
     if not ignore_cache and cache_path.exists():
         return np.load(cache_path)
 
-    colors = _stack_image_colors_no_cache(filename, num_colors, pool_bits)
+    img = Image.open(filename)
+    img = img.convert("RGBA")
+    colors = stack_pool_cut_colors(np.array(img), num, pool_bits)
     np.save(cache_path, colors)
     return colors
 
 
-_SuperclusterT = TypeVar("_SuperclusterT", bound=SuperclusterBase)
-
-
-def get_image_clusters(
+def get_image_supercluster(
     return_type: type[_SuperclusterT],
     filename: Path | str,
-    num_colors: int = 512,
-    pool_bits: NBits = 6,
+    num: int | None = None,
+    pool_bits: NBits | None = None,
     *,
     ignore_cache: bool = False,
 ) -> _SuperclusterT:
@@ -94,28 +112,30 @@ def get_image_clusters(
 
     :param return_type: the type of SuperclusterBase to return.
     :param filename: the path to an image file
-    :param num_colors: the number of colors to reduce to. The default of 512 will
-        cluster quickly down to medium-sized clusters.
-    :param pool_bits: the number of bits to pool colors by. The default of 6 is a
-    good value. You can probably just ignore this parameter, but it's here to
-        eliminate a "magic number" from the code.
+    :param num: the number of colors to reduce to. Default is 512.
+    :param pool_bits: the number of bits to pool colors by. Default is 6. Leave it.
     :param ignore_cache: if True, ignore any cached results and recompute the colors.
     :return: a KMedSupercluster instance containing all the colors in the image
     """
-    stacked_colors = stack_image_colors(
-        filename, num_colors, pool_bits, ignore_cache=ignore_cache
+    stacked_colors = stack_pool_cut_image_colors(
+        filename, num, pool_bits, ignore_cache=ignore_cache
     )
     return return_type.from_stacked_vectors(stacked_colors)
 
 
-def show_clusters(
-    supercluster: SuperclusterBase, filename: str | os.PathLike[str]
+def show_color_supercluster(
+    supercluster: SuperclusterBase,
+    filename: str | os.PathLike[str],
+    which_center: CenterName | None = None,
 ) -> None:
     """Create a png with the exemplar of each cluster.
 
     :param supercluster: the clusters to show
     :param filename: the filename to use for the output file. The number of clusters
         will be added as an infix.
+    :param which_center: optionally specify a cluster center attribute. Choices are
+        'weighted_median', 'weighted_medoid', or 'unweighted_medoid'. Default is
+        'weighted_median'.
     """
     width = 1000
     sum_weight = sum(supercluster.members.weights)
@@ -123,7 +143,7 @@ def show_clusters(
     for cluster in supercluster.clusters:
         stripe_width = max(round(cluster.weight / sum_weight * width), 1)
         stripes.append(
-            np.tile(cluster.get_as_vector(), (800, stripe_width))
+            np.tile(cluster.get_as_vector(which_center), (800, stripe_width))
             .reshape(800, stripe_width, 3)
             .astype(np.uint8)
         )

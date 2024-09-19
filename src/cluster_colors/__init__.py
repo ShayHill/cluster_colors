@@ -12,19 +12,28 @@ from cluster_colors.exceptions import (
     FailedToMergeError,
     FailedToSplitError,
 )
-from cluster_colors.image_colors import get_image_clusters, show_clusters
+from cluster_colors.image_colors import (
+    get_color_supercluster,
+    get_image_supercluster,
+    show_color_supercluster,
+    stack_pool_cut_colors,
+    stack_pool_cut_image_colors,
+)
 from cluster_colors.vector_stacker import stack_vectors
 
 __all__ = [
     "AgglomerativeSupercluster",
-    "DivisiveSupercluster",
-    "SuperclusterBase",
-    "get_image_clusters",
-    "show_clusters",
-    "stack_vectors",
-    "Members",
     "Cluster",
+    "DivisiveSupercluster",
     "EmptySuperclusterError",
-    "FailedToSplitError",
     "FailedToMergeError",
+    "FailedToSplitError",
+    "Members",
+    "SuperclusterBase",
+    "get_color_supercluster",
+    "get_image_supercluster",
+    "show_color_supercluster",
+    "stack_pool_cut_colors",
+    "stack_pool_cut_image_colors",
+    "stack_vectors",
 ]
