@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
+from basic_colormath import get_delta_e_matrix
 from PIL import Image
 
 from cluster_colors.cluster_supercluster import SuperclusterBase
@@ -67,8 +68,9 @@ def get_color_supercluster(
     :param pool_bits: the number of bits to pool colors by. Default is 6. Leave it.
     :return: a SuperclusterBase instance
     """
-    colors = stack_pool_cut_colors(colors, num, pool_bits)
-    return return_type.from_stacked_vectors(colors)
+    stacked_colors = stack_pool_cut_colors(colors, num, pool_bits)
+    pmatrix = get_delta_e_matrix(stacked_colors[:, :3])
+    return return_type.from_stacked_vectors(stacked_colors, pmatrix=pmatrix)
 
 
 def stack_pool_cut_image_colors(
@@ -120,7 +122,8 @@ def get_image_supercluster(
     stacked_colors = stack_pool_cut_image_colors(
         filename, num, pool_bits, ignore_cache=ignore_cache
     )
-    return return_type.from_stacked_vectors(stacked_colors)
+    pmatrix = get_delta_e_matrix(stacked_colors[:, :3])
+    return return_type.from_stacked_vectors(stacked_colors, pmatrix=pmatrix)
 
 
 def show_color_supercluster(
