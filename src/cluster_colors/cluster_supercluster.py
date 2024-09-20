@@ -383,7 +383,7 @@ class SuperclusterBase:
         FailedToSplitError should be raised before that happens.
         """
         candidates = (c for c in self.clusters if len(c.ixs) > 1)
-        return max(candidates, key=lambda c: c.sum_error)
+        return max(candidates, key=lambda c: c.error)
 
     def _get_next_to_merge(self) -> tuple[Cluster, Cluster]:
         """Return the next set of clusters to merge.
