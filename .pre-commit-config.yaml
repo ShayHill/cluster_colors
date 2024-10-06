@@ -6,7 +6,7 @@ ci:
 repos:
 
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v4.6.0
+  rev: v5.0.0
   hooks:
     - id: check-added-large-files
     - id: check-ast
@@ -124,7 +124,7 @@ repos:
   # PYI019 Method should used typing.Self instead of TypeVar (incompatible with Python 3.10)
   # PLR2004 Magic numbers
   #
-  rev: 'v0.6.3'
+  rev: 'v0.6.9'
   hooks:
     - id: ruff
       exclude: "tests"
@@ -136,6 +136,6 @@ repos:
 
 # reads pyproject.toml for additional config
 - repo: https://github.com/RobertCraigie/pyright-python
-  rev: v1.1.378
+  rev: v1.1.383
   hooks:
     - id: pyright
