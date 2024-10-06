@@ -123,6 +123,8 @@ repos:
   # D401 First line should be in imperative mood
   # PYI019 Method should used typing.Self instead of TypeVar (incompatible with Python 3.10)
   # PLR2004 Magic numbers
+  # SIM108 Use ternary operator
+  # PLR0913 Too many arguments
   #
   rev: 'v0.6.9'
   hooks:
@@ -131,7 +133,7 @@ repos:
       args:
       - --target-version=py310
       - --select=ALL
-      - --ignore=COM812,D203,D213,ISC003,ANN101,ANN102,ANN201,ANN202,D400,D401,PYI019,PLR2004
+      - --ignore=COM812,D203,D213,ISC003,ANN101,ANN102,ANN201,ANN202,D400,D401,PYI019,PLR2004,SIM108,PLR0913
       # - --fix
 
 # reads pyproject.toml for additional config

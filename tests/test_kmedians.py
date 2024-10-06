@@ -1,7 +1,7 @@
 """Test methods in KMedDivisiveSupercluster
 
 :author: Shay Hill
-:created: 2023-03-14
+/created: 2023-03-14
 """
 
 # pyright: reportPrivateUsage=false
@@ -65,7 +65,7 @@ class TestSubset:
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters_m = len(clusters.ixs)
         clusters.set_n(8)
-        subset = clusters.copy(exclude_clusters=(4, 5, 6, 7))
+        subset = clusters.copy(exc_clusters=(4, 5, 6, 7))
         subset_ixs = sorted(it.chain(*[c.ixs for c in clusters.clusters[:4]]))
         assert subset.members.vectors.shape == (clusters_m, 3)
         assert subset.members.weights.shape == (clusters_m,)
@@ -76,7 +76,7 @@ class TestSubset:
         """Vectors and pmatrix are filtered. Indices are sequential."""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(8)
-        subset = clusters.copy(exclude_clusters=(4, 5, 6, 7), reindex=True)
+        subset = clusters.copy(exc_clusters=(4, 5, 6, 7), reindex=True)
         subset_ixs = sorted(it.chain(*[c.ixs for c in clusters.clusters[:4]]))
         subset_cnt = len(subset_ixs)
         assert subset.members.vectors.shape == (subset_cnt, 3)
@@ -89,7 +89,7 @@ class TestSubset:
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters_m = len(clusters.ixs)
         clusters.set_n(8)
-        subset = clusters.copy(exclude_clusters=(4, 5, 6, 7))
+        subset = clusters.copy(exc_clusters=(4, 5, 6, 7))
         subset.set_n(4)
         subset_ixs = sorted(it.chain(*[c.ixs for c in clusters.clusters[:4]]))
         assert subset.members.vectors.shape == (clusters_m, 3)
@@ -101,7 +101,7 @@ class TestSubset:
         """Nothing should change"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(8)
-        subset = clusters.copy(exclude_clusters=(4, 5, 6, 7), reindex=True)
+        subset = clusters.copy(exc_clusters=(4, 5, 6, 7), reindex=True)
         subset.set_n(4)
         subset_ixs = sorted(it.chain(*[c.ixs for c in clusters.clusters[:4]]))
         subset_cnt = len(subset_ixs)
@@ -113,7 +113,7 @@ class TestSubset:
         """Raise FailedToSplitError if trying to split past m"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(8)
-        subset = clusters.copy(exclude_clusters=(4, 5, 6, 7))
+        subset = clusters.copy(exc_clusters=(4, 5, 6, 7))
         subset_m = len(subset.ixs)
         subset.set_n(subset_m)
         with pytest.raises(FailedToSplitError):
@@ -123,24 +123,21 @@ class TestSubset:
         """Raise FailedToSplitError if trying to split past m"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(8)
-        subset = clusters.copy(exclude_clusters=(4, 5, 6, 7), reindex=True)
+        subset = clusters.copy(exc_clusters=(4, 5, 6, 7), reindex=True)
         subset_m = len(subset.ixs)
         subset.set_n(subset_m)
         with pytest.raises(FailedToSplitError):
             subset.split()
 
-    def test_exclude_clusters_vs_exclude_member_clusters(self, colors: ColorsArray):
+    def test_exc_clusters_vs_exc_member_clusters(self, colors: ColorsArray):
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(8)
-        exclude_clusters = (4, 5, 6, 7)
-        exclude_member_clusters = (
-            clusters.clusters[x].ixs[0] for x in exclude_clusters
-        )
-        subset_a = clusters.copy(exclude_clusters=exclude_clusters)
-        subset_b = clusters.copy(exclude_member_clusters=exclude_member_clusters)
+        exc_clusters = (4, 5, 6, 7)
+        exc_member_clusters = (clusters.clusters[x].ixs[0] for x in exc_clusters)
+        subset_a = clusters.copy(exc_clusters=exc_clusters)
+        subset_b = clusters.copy(exc_member_clusters=exc_member_clusters)
         subset_c = clusters.copy(
-            exclude_clusters=exclude_clusters,
-            exclude_member_clusters=exclude_member_clusters,
+            exc_clusters=exc_clusters, exc_member_clusters=exc_member_clusters
         )
         np.testing.assert_array_equal(subset_a.ixs, subset_b.ixs)
         np.testing.assert_array_equal(subset_b.ixs, subset_c.ixs)
@@ -149,31 +146,7 @@ class TestSubset:
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(8)
         with pytest.raises(EmptySuperclusterError):
-            _ = clusters.copy(exclude_clusters=(0, 1, 2, 3, 4, 5, 6, 7))
-
-    def test_without_clusters(self, colors: ColorsArray):
-        clusters = DivisiveSupercluster.from_stacked_vectors(colors)
-        clusters.set_n(8)
-        exclude = (4, 5, 6, 7)
-        copy_a = clusters.copy(exclude_clusters=exclude)
-        copy_b = clusters.without_clusters(*exclude)
-        np.testing.assert_array_equal(copy_a.ixs, copy_b.ixs)
-
-    def test_without_member_clusters(self, colors: ColorsArray):
-        clusters = DivisiveSupercluster.from_stacked_vectors(colors)
-        clusters.set_n(8)
-        exclude = (4, 5, 6, 7)
-        copy_a = clusters.copy(exclude_member_clusters=exclude)
-        copy_b = clusters.without_member_clusters(*exclude)
-        np.testing.assert_array_equal(copy_a.ixs, copy_b.ixs)
-
-    def test_without_members(self, colors: ColorsArray):
-        clusters = DivisiveSupercluster.from_stacked_vectors(colors)
-        clusters.set_n(8)
-        exclude = (4, 5, 6, 7)
-        copy_a = clusters.copy(exclude_members=exclude)
-        copy_b = clusters.without_members(*exclude)
-        np.testing.assert_array_equal(copy_a.ixs, copy_b.ixs)
+            _ = clusters.copy(exc_clusters=(0, 1, 2, 3, 4, 5, 6, 7))
 
 
 class TestPredicates:

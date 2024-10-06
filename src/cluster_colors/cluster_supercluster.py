@@ -174,23 +174,56 @@ class SuperclusterBase:
     #   filtered copies
     # ===============================================================================
 
+    def _fill_inc_or_exc(
+        self,
+        cluster_ixs: Iterable[int],
+        member_cluster_ixs: Iterable[int],
+        member_ixs: Iterable[int],
+    ) -> set[int]:
+        """Return a set of member indices to include or exclude.
+
+        :param cluster_ixs: indices of clusters to include or exclude
+        :param member_cluster_ixs: indices of members to include or exclude. For each
+            given member, the cluster that contains that member will be included or
+            excluded.
+        :param member_ixs: indices of members to include or exclude.
+        :return: set of member indices
+        """
+        clusters = set(cluster_ixs)
+        clusters.update(self.find_member(m_i) for m_i in member_cluster_ixs)
+        members = set(it.chain(*[self.clusters[c_i].ixs for c_i in clusters]))
+        return members | set(member_ixs)
+
     def copy(
         self: _SuperclusterT,
         *,
-        exclude_clusters: Iterable[int] = (),
-        exclude_member_clusters: Iterable[int] = (),
-        exclude_members: Iterable[int] = (),
+        inc_clusters: Iterable[int] = (),
+        inc_member_clusters: Iterable[int] = (),
+        inc_members: Iterable[int] = (),
+        exc_clusters: Iterable[int] = (),
+        exc_member_clusters: Iterable[int] = (),
+        exc_members: Iterable[int] = (),
         reindex: bool = False,
     ) -> _SuperclusterT:
         """Create a SuperclusterBase instance from a subset of clusters.
 
-        :param exclude_clusters: indices of clusters to exclude from the subset
-        :param exclude_member_clusters: indices of members to exclude from the
+        :param inc_clusters: indices of clusters to include in the subset
+        :param inc_member_clusters: indices of members to include in the subset. For
+            each given member, the cluster that contains that member will be
+            included.
+        :param inc_members: indices of members to include in the subset.
+        :param exc_clusters: indices of clusters to exclude from the subset
+        :param exc_member_clusters: indices of members to exclude from the
             subset. For each given member, the cluster that contains that member will
             be excluded.
-        :param exclude_members: indices of members to exclude from the subset.
+        :param exc_members: indices of members to exclude from the subset.
         :param reindex: Optionally reindex the members of the subset.
         :return: a new SuperclusterBase instance with members from the subset
+
+        If no arguments are given for `inc_`, excluded members will be excluded from
+        the entire supercluster. If any `inc_` arguments are passed, only members
+        explicitly included will be included, and the `exc_` arguments will be
+        excluded from that `inc_` subset.
 
         If reindex=True, reindex the members of the subset. Filter members.vectors,
         members.weights, and members.pmatrix. Self.ixs will be range(len(subset)).
@@ -203,17 +236,13 @@ class SuperclusterBase:
         carry around some extra data, but indices to the parent supercluster members
         will be preserved.
         """
-        ixs_as_set = set(self.ixs)
-        exclude_clusters = set(exclude_clusters)
-        exclude_clusters.update(
-            self.find_member(m_i) for m_i in exclude_member_clusters
-        )
-        exclude_ixs = set(
-            it.chain(*[self.clusters[c_i].ixs for c_i in exclude_clusters])
-        )
-        exclude_ixs |= set(exclude_members)
-        ixs_as_set -= exclude_ixs
-        ixs = sorted(ixs_as_set)
+        include = self._fill_inc_or_exc(inc_clusters, inc_member_clusters, inc_members)
+        exclude = self._fill_inc_or_exc(exc_clusters, exc_member_clusters, exc_members)
+
+        if include:
+            ixs = sorted(include - exclude)
+        else:
+            ixs = sorted(set(self.ixs) - exclude)
 
         if reindex is False:
             return self.__class__(self.members, ixs)
@@ -225,42 +254,6 @@ class SuperclusterBase:
             subset_vectors, weights=subset_weights, pmatrix=subset_pmatrix
         )
         return self.__class__(subset_members)
-
-    def without_clusters(
-        self: _SuperclusterT, *ixs: int, reindex: bool = False
-    ) -> _SuperclusterT:
-        """Remove clusters from the Supercluster instance.
-
-        :param ixs: indices of clusters to remove
-        :param reindex: Optionally reindex the members. This will preserve the
-            calculations in the pmatrix, but will otherwise be as if the members had
-            never existed.
-        """
-        return self.copy(exclude_clusters=ixs, reindex=reindex)
-
-    def without_member_clusters(
-        self: _SuperclusterT, *member_ixs: int, reindex: bool = False
-    ) -> _SuperclusterT:
-        """Remove clusters that contain the given members.
-
-        :param member_ixs: indices of members to remove
-        :param reindex: Optionally reindex the members. This will preserve the
-            calculations in the pmatrix, but will otherwise be as if the members had
-            never existed.
-        """
-        return self.copy(exclude_member_clusters=member_ixs, reindex=reindex)
-
-    def without_members(
-        self: _SuperclusterT, *ixs: int, reindex: bool = False
-    ) -> _SuperclusterT:
-        """Remove members from the Supercluster instance.
-
-        :param ixs: indices of members to remove
-        :param reindex: Optionally reindex the members. This will preserve the
-            calculations in the pmatrix, but will otherwise be as if the members had
-            never existed.
-        """
-        return self.copy(exclude_members=ixs, reindex=reindex)
 
     # ===========================================================================
     #   properties
