@@ -26,6 +26,7 @@ to return either a single cluster or a cluster for each member.
 from __future__ import annotations
 
 import itertools as it
+from collections.abc import Callable
 from contextlib import suppress
 from typing import TYPE_CHECKING, Literal, TypeVar
 
@@ -50,9 +51,50 @@ if TYPE_CHECKING:
         VectorsLike,
     )
 
-_CachedState = tuple[tuple[int, ...], ...]
+from typing import cast
 
+_CachedState = tuple[tuple[int, ...], ...]
 _SuperclusterT = TypeVar("_SuperclusterT", bound="SuperclusterBase")
+_GetterT = TypeVar("_GetterT", bound="Callable[[SuperclusterBase], float]")
+_SetterT = TypeVar("_SetterT", bound="Callable[[SuperclusterBase, float], None]")
+
+
+def check_empty_supercluster_get(method: _GetterT) -> _GetterT:
+    """Decorator to raise EmptySuperclusterError if self.n is 0.
+
+    Raise this exception for methods that are invalid on an empty supercluster.
+    """
+
+    def wrapper(self: SuperclusterBase) -> float:
+        m_name = method.__name__
+        if self.n == 0:
+            msg = par(
+                f"""The supercluster is empty. Attempt to execute method '{m_name}'
+                failed."""
+            )
+            raise exceptions.EmptySuperclusterError(msg)
+        return method(self)
+
+    return cast(_GetterT, wrapper)
+
+
+def check_empty_supercluster_set(method: _SetterT) -> _SetterT:
+    """Decorator to raise EmptySuperclusterError if self.n is 0.
+
+    Raise this exception for methods that are invalid on an empty supercluster.
+    """
+
+    def wrapper(self: SuperclusterBase, val: float):
+        m_name = method.__name__
+        if self.n == 0:
+            msg = par(
+                f"""The supercluster is empty. Attempt to execute method '{m_name}'
+                failed."""
+            )
+            raise exceptions.EmptySuperclusterError(msg)
+        return method(self, val)
+
+    return cast(_SetterT, wrapper)
 
 
 class SuperclusterBase:
@@ -90,13 +132,9 @@ class SuperclusterBase:
         :param ixs: optional list of indices to use from the Members instance. This
             can be used to create a subset of clusters from another Subcluster
             instance using the same Members instance.
-        :raise EmptySuperclusterError: if ixs is empty
         """
         self.members = members
         self.ixs = np.arange(len(members)) if ixs is None else np.array(sorted(ixs))
-
-        if self.ixs.shape[0] == 0:
-            raise exceptions.EmptySuperclusterError
 
         class _Cluster(Cluster):
             quality_metric = self.quality_metric
@@ -110,6 +148,8 @@ class SuperclusterBase:
 
     def _initialize_clusters(self) -> list[Cluster]:
         """Create clusters from the members."""
+        if len(self.ixs) == 0:
+            return []
         match self.clustering_method:
             case "divisive":
                 return [self.cluster_type(self.members, self.ixs)]
@@ -273,6 +313,8 @@ class SuperclusterBase:
         :return as_stacked_vectors: members as a numpy array (n, m+1) with the last
             column as the weight.
         """
+        if self.n == 0:
+            return self.members.stacked_vectors[:0]
         as_stacked_vectors = np.array(
             [c.get_as_stacked_vector(which_center) for c in self.clusters]
         )
@@ -285,6 +327,8 @@ class SuperclusterBase:
             are 'weighted_median', 'weighted_medoid', or 'unweighted_medoid'. Default
             is 'weighted_median'.
         """
+        if self.n == 0:
+            return self.members.vectors[:0]
         return self.get_as_stacked_vectors(which_center)[:, :-1]
 
     # ===========================================================================
@@ -433,6 +477,9 @@ class SuperclusterBase:
 
         :param n: number of clusters
         """
+        if self.n == 0:
+            msg = "No clusters to merge or split."
+            raise exceptions.EmptySuperclusterError(msg)
         self._split_to_n(n)
         self._merge_to_n(n)
 
@@ -442,6 +489,9 @@ class SuperclusterBase:
         This sets the state of the Supercluster instance. If the state is already
         >=n, nothing happens.
         """
+        if self.n == 0:
+            msg = "No clusters to split."
+            raise exceptions.FailedToSplitError(msg)
         self._split_to_n(self.n + 1)
 
     def merge(self):
@@ -450,6 +500,9 @@ class SuperclusterBase:
         This sets the state of the Supercluster instance. If the state is already
         <=n, nothing happens.
         """
+        if self.n == 0:
+            msg = "No clusters to merge."
+            raise exceptions.FailedToMergeError(msg)
         self._merge_to_n(self.n - 1)
 
     # ===========================================================================
@@ -482,10 +535,12 @@ class SuperclusterBase:
             while not predicate(self):
                 self.split()
 
+    @check_empty_supercluster_get
     def get_max_sum_error(self) -> float:
         """Return the maximum sum of errors of any cluster."""
         return max(c.span for c in self.clusters)
 
+    @check_empty_supercluster_set
     def set_max_sum_error(self, max_sum_error: float):
         """Split as far as necessary to get below the threshold.
 
@@ -497,10 +552,12 @@ class SuperclusterBase:
 
         self.split_till_true(predicate)
 
+    @check_empty_supercluster_get
     def get_max_span(self) -> float:
         """Return the minimum maximum cost of any cluster."""
         return max(c.span for c in self.clusters)
 
+    @check_empty_supercluster_set
     def set_max_span(self, max_span: float):
         """Split as far as necessary to get below the threshold.
 
@@ -512,10 +569,12 @@ class SuperclusterBase:
 
         self.split_till_true(predicate)
 
+    @check_empty_supercluster_get
     def get_max_max_error(self) -> float:
         """Return the maximum max_error of any cluster."""
         return max(c.max_error for c in self.clusters)
 
+    @check_empty_supercluster_set
     def set_max_max_error(self, max_max_error: float):
         """Split as far as necessary to get below the threshold.
 
@@ -527,10 +586,12 @@ class SuperclusterBase:
 
         self.split_till_true(predicate)
 
+    @check_empty_supercluster_get
     def get_max_avg_error(self) -> float:
         """Return the maximum avg_error of any cluster."""
         return max(c.avg_error for c in self.clusters)
 
+    @check_empty_supercluster_set
     def set_max_avg_error(self, max_avg_error: float):
         """Split as far as necessary to get below the threshold.
 

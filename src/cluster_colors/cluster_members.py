@@ -64,29 +64,29 @@ class Members:
         input pmatrix to match. If you pass identical vectors and a pmatrix, you will
         get a ValueError.
         """
-        self._stacked_vectors = np.asarray(vectors)
+        self.stacked_vectors = np.asarray(vectors)
 
         if weights is None:
             pass
         elif isinstance(weights, int | float):
-            self._stacked_vectors = add_weight_axis(self._stacked_vectors, weights)
+            self.stacked_vectors = add_weight_axis(self.stacked_vectors, weights)
         else:
             weights = np.asarray(list(weights)).reshape(-1, 1)
-            self._stacked_vectors = np.hstack((self._stacked_vectors, weights))
+            self.stacked_vectors = np.hstack((self.stacked_vectors, weights))
 
         # sort input vectors
-        sort_indices = np.lexsort(self._stacked_vectors.T[::-1])
-        self._stacked_vectors = self._stacked_vectors[sort_indices]
+        sort_indices = np.lexsort(self.stacked_vectors.T[::-1])
+        self.stacked_vectors = self.stacked_vectors[sort_indices]
 
         # stack input vectors to remove duplicates
-        ensure_stacked = stack_vectors(self._stacked_vectors)
-        if self._stacked_vectors.shape != ensure_stacked.shape and pmatrix is not None:
+        ensure_stacked = stack_vectors(self.stacked_vectors)
+        if self.stacked_vectors.shape != ensure_stacked.shape and pmatrix is not None:
             msg = par(
                 """Input pmatrix shape does not conform to input vectors after
                 stacking duplicates."""
             )
             raise ValueError(msg)
-        self._stacked_vectors = ensure_stacked
+        self.stacked_vectors = ensure_stacked
 
         if pmatrix is None:
             self._pmatrix = None
@@ -117,7 +117,7 @@ class Members:
 
         :return: array of vectors
         """
-        return self._stacked_vectors[:, :-1]
+        return self.stacked_vectors[:, :-1]
 
     @property
     def weights(self) -> FPArray:
@@ -125,7 +125,7 @@ class Members:
 
         :return: array of weights
         """
-        return self._stacked_vectors[:, -1]
+        return self.stacked_vectors[:, -1]
 
     @functools.cached_property
     def weighted_pmatrix(self) -> ProximityMatrix:

@@ -21,7 +21,7 @@ from cluster_colors.cluster_supercluster import (
     AgglomerativeSupercluster,
     DivisiveSupercluster,
 )
-from cluster_colors.exceptions import EmptySuperclusterError, FailedToSplitError
+from cluster_colors.exceptions import FailedToSplitError
 from cluster_colors.vector_stacker import stack_vectors
 
 ColorsArray = Annotated[npt.NDArray[np.float64], (-1, 3)]
@@ -145,8 +145,8 @@ class TestSubset:
     def test_make_empty(self, colors: ColorsArray):
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(8)
-        with pytest.raises(EmptySuperclusterError):
-            _ = clusters.copy(exc_clusters=(0, 1, 2, 3, 4, 5, 6, 7))
+        empty = clusters.copy(exc_clusters=(0, 1, 2, 3, 4, 5, 6, 7))
+        assert empty.n == 0
 
 
 class TestPredicates:
