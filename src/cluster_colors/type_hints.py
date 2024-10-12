@@ -23,6 +23,11 @@ Vector: TypeAlias = Annotated[FPArray, (-1,)]
 # something that can be cast to a vector
 VectorLike: TypeAlias = Sequence[float] | Vector
 
+# a 1D array of integers
+Indices: TypeAlias = Annotated[npt.NDArray[np.int64], (-1,)]
+# something that can be cast to a 1D array of integers
+IndicesLike: TypeAlias = Sequence[int] | Indices
+
 # an array of vectors, (x, ...) or (x, ..., w)
 Vectors: TypeAlias = Annotated[npt.NDArray[np.float64], (-1, -1)]
 # something that can be cast to vectors

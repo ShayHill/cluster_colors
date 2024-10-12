@@ -44,9 +44,9 @@ if TYPE_CHECKING:
         CenterName,
         CentroidName,
         FPArray,
+        IndicesLike,
         ProximityMatrix,
         QualityMetric,
-        VectorLike,
         Vectors,
         VectorsLike,
     )
@@ -125,7 +125,7 @@ class SuperclusterBase:
     assignment_centroid: CentroidName = "weighted_medoid"
     clustering_method: Literal["divisive", "agglomerative"] = "divisive"
 
-    def __init__(self, members: Members, ixs: VectorLike | None = None) -> None:
+    def __init__(self, members: Members, ixs: IndicesLike | None = None) -> None:
         """Create a new Supercluster instance.
 
         :param members: Members instance
