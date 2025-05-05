@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
-from basic_colormath import floats_to_uint8, get_delta_e_matrix
+from basic_colormath import get_delta_e_matrix
 from PIL import Image
 
 from cluster_colors.cluster_supercluster import SuperclusterBase
@@ -50,10 +50,10 @@ def stack_pool_cut_colors(
     """
     num = num or 512
     pool_bits = pool_bits or 6
-    colors = stack_vectors(np.array(colors))
-    colors = pool_colors(colors, pool_bits)
-    colors = cut_colors(colors, num)
-    return floats_to_uint8(colors).astype(np.float64)
+    float_colors = np.array(colors, dtype=np.float64)
+    float_colors = stack_vectors(np.array(float_colors))
+    float_colors = pool_colors(float_colors, pool_bits)
+    return cut_colors(float_colors, num)
 
 
 def get_color_supercluster(
