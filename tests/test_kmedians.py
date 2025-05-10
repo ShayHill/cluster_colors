@@ -24,7 +24,7 @@ from cluster_colors.cluster_supercluster import (
 from cluster_colors.exceptions import FailedToSplitError
 from cluster_colors.vector_stacker import stack_vectors
 
-ColorsArray = Annotated[npt.NDArray[np.float64], (-1, 3)]
+ColorsArray = Annotated[npt.NDArray[np.floating], (-1, 3)]
 
 
 @pytest.fixture(

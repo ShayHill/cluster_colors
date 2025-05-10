@@ -16,7 +16,7 @@ Pixels: TypeAlias = Annotated[npt.NDArray[np.number[Any]], "(..., -1)"]
 
 # array that has been cast to float, but it not expected to have a weight axis or
 # particular shape.
-FPArray: TypeAlias = npt.NDArray[np.float64]
+FPArray: TypeAlias = npt.NDArray[np.floating]
 
 # a 1D array of floats
 Vector: TypeAlias = Annotated[FPArray, (-1,)]
@@ -24,12 +24,12 @@ Vector: TypeAlias = Annotated[FPArray, (-1,)]
 VectorLike: TypeAlias = Sequence[float] | Vector
 
 # a 1D array of integers
-Indices: TypeAlias = Annotated[npt.NDArray[np.int64], (-1,)]
+Indices: TypeAlias = Annotated[npt.NDArray[np.intp], (-1,)]
 # something that can be cast to a 1D array of integers
 IndicesLike: TypeAlias = Sequence[int] | Indices
 
 # an array of vectors, (x, ...) or (x, ..., w)
-Vectors: TypeAlias = Annotated[npt.NDArray[np.float64], (-1, -1)]
+Vectors: TypeAlias = Annotated[npt.NDArray[np.floating], (-1, -1)]
 # something that can be cast to vectors
 VectorsLike: TypeAlias = Sequence[Sequence[float]] | Vectors
 

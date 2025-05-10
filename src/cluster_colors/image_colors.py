@@ -50,7 +50,7 @@ def stack_pool_cut_colors(
     """
     num = num or 512
     pool_bits = pool_bits or 6
-    float_colors = np.array(colors, dtype=np.float64)
+    float_colors = np.array(colors, dtype=np.floating)
     float_colors = stack_vectors(np.array(float_colors))
     float_colors = pool_colors(float_colors, pool_bits)
     return cut_colors(float_colors, num)

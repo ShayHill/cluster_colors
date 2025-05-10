@@ -18,7 +18,7 @@ import pytest
 
 from cluster_colors import cut_colors, vector_stacker as sv
 
-ColorsArray = Annotated[npt.NDArray[np.float64], (-1, 3)]
+ColorsArray = Annotated[npt.NDArray[np.floating], (-1, 3)]
 
 
 @pytest.fixture(

@@ -108,9 +108,9 @@ class Cluster:
         """
         self.members = members
         if ixs is None:
-            self.ixs = np.arange(len(self.members), dtype=np.int32)
+            self.ixs = np.arange(len(self.members), dtype=np.intp)
         else:
-            self.ixs = np.array(sorted(ixs), dtype=np.int32)
+            self.ixs = np.array(sorted(ixs), dtype=np.intp)
 
         self._eigenvalues: FPArray | None = None
         self._eigenvectors: FPArray | None = None
@@ -258,7 +258,7 @@ class Cluster:
             unweighted_medoid.
         :return: index of the mediod, respecting weights
         """
-        ixs_ = self.ixs if ixs is None else np.array(list(ixs), dtype=np.int32)
+        ixs_ = self.ixs if ixs is None else np.array(list(ixs), dtype=np.intp)
         if len(ixs_) == 1:
             return int(ixs_[0])
         pmatrix = self.members.weighted_pmatrix[np.ix_(ixs_, ixs_)]
