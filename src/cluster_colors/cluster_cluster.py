@@ -360,7 +360,8 @@ class Cluster:
             self._eigenvalues, self._eigenvectors = self._get_eigens()
         return self._eigenvectors
 
-    def _get_direction_of_highest_variance(self) -> FPArray:
+    @property
+    def axis_of_highest_variance(self) -> FPArray:
         """Get the first Eigenvector of the covariance matrix.
 
         :return: first Eigenvector of the covariance matrix
@@ -469,7 +470,7 @@ class Cluster:
             b) exactly on the splitting plane.
         See stacked_quantile module for details, but that case is covered here.
         """
-        abc = self._get_direction_of_highest_variance()
+        abc = self.axis_of_highest_variance
         vecs = self.members.vectors
 
         def rel_dist(x: np.signedinteger[Any]) -> float:
