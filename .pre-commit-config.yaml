@@ -44,7 +44,7 @@ repos:
         # files: .pre-commit-config.yaml
 
 - repo: https://github.com/pre-commit/mirrors-mypy
-  rev: v1.11.2
+  rev: v1.15.0
   hooks:
   - id: mypy
     name: mypy
@@ -60,20 +60,20 @@ repos:
     # files: ^(src/|tests/)
 
 - repo: https://github.com/PyCQA/isort
-  rev: 5.13.2
+  rev: 6.0.1
   hooks:
   - id: isort
     args: ["--profile", "black", "--filter-files", "--combine-as", "honor--noqa"]
 
 - repo: https://github.com/psf/black
-  rev: 24.10.0
+  rev: 25.1.0
   hooks:
   - id: black
     language_version: python3.10
     args: ["--skip-magic-trailing-comma"]
 
 - repo: https://github.com/asottile/pyupgrade
-  rev: v3.18.0
+  rev: v3.19.1
   hooks:
   - args:
     - --py310-plus
@@ -115,8 +115,6 @@ repos:
   # D213 multi line summary second line (incompatible with D212):
   # ISC003 Explicitly concatenated string should be implicitly concatenated
   #
-  # ANN101 Missing type annotation for self in method
-  # ANN102 Missing type annotation for cls in classmethod
   # ANN201 Asks for -> None return type annotation for public methods
   # ANN202 Asks for -> None return type annotation for private methods
   # D400 First line should end with a period
@@ -126,18 +124,18 @@ repos:
   # SIM108 Use ternary operator
   # PLR0913 Too many arguments
   #
-  rev: 'v0.6.9'
+  rev: 'v0.11.9'
   hooks:
     - id: ruff
       exclude: "tests"
       args:
       - --target-version=py310
       - --select=ALL
-      - --ignore=COM812,D203,D213,ISC003,ANN101,ANN102,ANN201,ANN202,D400,D401,PYI019,PLR2004,SIM108,PLR0913
+      - --ignore=COM812,D203,D213,ISC003,ANN201,ANN202,D400,D401,PYI019,PLR2004,SIM108,PLR0913
       # - --fix
 
 # reads pyproject.toml for additional config
 - repo: https://github.com/RobertCraigie/pyright-python
-  rev: v1.1.384
+  rev: v1.1.400
   hooks:
     - id: pyright
