@@ -75,7 +75,7 @@ def check_empty_supercluster_get(method: _GetterT) -> _GetterT:
             raise exceptions.EmptySuperclusterError(msg)
         return method(self)
 
-    return cast(_GetterT, wrapper)
+    return cast("_GetterT", wrapper)
 
 
 def check_empty_supercluster_set(method: _SetterT) -> _SetterT:
