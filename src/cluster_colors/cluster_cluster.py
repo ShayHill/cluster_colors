@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import functools
 import itertools
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from paragraphs import par
@@ -28,6 +28,7 @@ if TYPE_CHECKING:
         CenterName,
         CentroidName,
         FPArray,
+        IndicesLike,
         ProximityMatrix,
         QualityMetric,
         Vector,
@@ -96,7 +97,7 @@ class Cluster:
     quality_metric: QualityMetric = "sum_error"
     quality_centroid: CentroidName = "weighted_medoid"
 
-    def __init__(self, members: Members, ixs: Iterable[int] | None = None) -> None:
+    def __init__(self, members: Members, ixs: IndicesLike | None = None) -> None:
         """Identify a cluster by the indices of its members.
 
         :param members: Members instance
@@ -108,9 +109,9 @@ class Cluster:
         """
         self.members = members
         if ixs is None:
-            self.ixs = np.arange(len(self.members), dtype=np.intp)
+            self.ixs = np.arange(len(self.members))
         else:
-            self.ixs = np.array(sorted(ixs), dtype=np.intp)
+            self.ixs = np.array(sorted(map(int, ixs)), dtype=np.intp)
 
         self._eigenvalues: FPArray | None = None
         self._eigenvectors: FPArray | None = None
@@ -471,7 +472,7 @@ class Cluster:
         abc = self._get_direction_of_highest_variance()
         vecs = self.members.vectors
 
-        def rel_dist(x: int) -> float:
+        def rel_dist(x: np.signedinteger[Any]) -> float:
             return np.dot(abc, self.members.vectors[x])
 
         scored = sorted([(rel_dist(x), tuple(vecs[x]), x) for x in self.ixs])

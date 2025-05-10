@@ -4,7 +4,7 @@
 :created: 2022-10-22
 """
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import Annotated, Any, Literal, TypeAlias
 
 import numpy as np
@@ -26,7 +26,7 @@ VectorLike: TypeAlias = Sequence[float] | Vector
 # a 1D array of integers
 Indices: TypeAlias = Annotated[npt.NDArray[np.intp], (-1,)]
 # something that can be cast to a 1D array of integers
-IndicesLike: TypeAlias = Sequence[int] | Indices
+IndicesLike: TypeAlias = Iterable[int] | Iterable[np.signedinteger[Any]]
 
 # an array of vectors, (x, ...) or (x, ..., w)
 Vectors: TypeAlias = Annotated[npt.NDArray[np.floating], (-1, -1)]

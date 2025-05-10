@@ -134,7 +134,11 @@ class SuperclusterBase:
             instance using the same Members instance.
         """
         self.members = members
-        self.ixs = np.arange(len(members)) if ixs is None else np.array(sorted(ixs))
+        self.members = members
+        if ixs is None:
+            self.ixs = np.arange(len(self.members))
+        else:
+            self.ixs = np.array(sorted(map(int, ixs)), dtype=np.intp)
 
         class _Cluster(Cluster):
             quality_metric = self.quality_metric
