@@ -36,7 +36,7 @@ class TestPoolColors:
         """Total weight of all colors is number of pixels."""
         img = Image.open(TEST_DIR / "sugar-shack-barnes.jpg")
         colors = np.array(img)[:100, :100]
-        weights = np.full(colors.shape[:-1], 1, dtype=float)
+        weights = np.full(colors.shape[:-1], 1, dtype=np.float64)
         weighted_colors = stack_vectors(np.dstack((colors, weights)))
         reduced = pool_colors.pool_colors(weighted_colors, 4)
         assert np.sum(reduced[..., 3]) == colors.shape[0] * colors.shape[1]
