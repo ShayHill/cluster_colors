@@ -1,6 +1,6 @@
 [project]
 name = "cluster_colors"
-version = "1.0.0"
+version = "0.18.0"
 description = "Cluster rgb vectors with divisive kmedians"
 readme = "README.md"
 license = "MIT"
@@ -31,9 +31,9 @@ dev = ["commitizen", "pre-commit", "pytest", "pillow", "matplotlib"]
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "1.0.0"
+version = "0.18.0"
 tag_format = "$version"
-major-version-zero = true
+major_version_zero = true
 version_files = ["pyproject.toml:^version"]
 
 
