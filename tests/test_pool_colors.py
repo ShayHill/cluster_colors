@@ -12,7 +12,6 @@
 # pyright: reportMissingParameterType=false
 
 import random
-from typing import TypeVar
 
 import numpy as np
 from PIL import Image
@@ -22,8 +21,6 @@ from cluster_colors.cluster_supercluster import DivisiveSupercluster
 from cluster_colors.paths import TEST_DIR
 from cluster_colors.vector_stacker import stack_vectors
 
-_T = TypeVar("_T")
-
 DIAG = np.array([(i, i, i, i + 1) for i in range(256)])
 
 img = Image.open(TEST_DIR / "sugar-shack-barnes.jpg")
@@ -32,7 +29,7 @@ stacked_colors = stack_vectors(colors)
 
 
 class TestPoolColors:
-    def test_sum_weight(self):
+    def test_sum_weight(self) -> None:
         """Total weight of all colors is number of pixels."""
         img = Image.open(TEST_DIR / "sugar-shack-barnes.jpg")
         colors = np.array(img)[:100, :100]
@@ -41,16 +38,18 @@ class TestPoolColors:
         reduced = pool_colors.pool_colors(weighted_colors, 4)
         assert np.sum(reduced[..., 3]) == colors.shape[0] * colors.shape[1]
 
-    def test_robust_to_order(self):
+    def test_robust_to_order(self) -> None:
         """Order of colors should not matter."""
         reduced = {tuple(x) for x in pool_colors.pool_colors(stacked_colors, 4)}
         reduced2 = {tuple(x) for x in pool_colors.pool_colors(stacked_colors[::-1], 4)}
         assert reduced == reduced2
 
-    def test_robust_to_order_with_ties(self):
+    def test_robust_to_order_with_ties(self) -> None:
         """Order does not matter, even with ties."""
 
-        def split_ten_times(vecs):
+        def split_ten_times(
+            vecs: list[tuple[int, int, int]],
+        ) -> set[tuple[np.int_, ...]]:
             clusters = DivisiveSupercluster.from_vectors(np.array(vecs))
             for _ in range(10):
                 clusters.split()
@@ -63,13 +62,13 @@ class TestPoolColors:
             result = split_ten_times(vecs_)
             assert result == expect
 
-    def test_singles(self):
+    def test_singles(self) -> None:
         """When color has a weight of 1 and does not stack, return same."""
         reduced = {tuple(x) for x in pool_colors.pool_colors(colors, 4)}
         reduced2 = {tuple(x) for x in pool_colors.pool_colors(colors[::-1], 4)}
         assert reduced == reduced2
 
-    def test_small_number_of_identical_colors(self):
+    def test_small_number_of_identical_colors(self) -> None:
         """Do not return identical colors.
 
         Previousy, `pool_colors` would not try to pool when there were fewer input

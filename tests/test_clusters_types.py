@@ -9,10 +9,12 @@ import numpy as np
 from cluster_colors.cluster_members import Members
 from cluster_colors.cluster_supercluster import DivisiveSupercluster
 
+rng = np.random.default_rng()
+
 
 class TestSupercluster:
-    def test_as_one_cluster(self):
+    def test_as_one_cluster(self) -> None:
         """Test the as_one_cluster method."""
-        members = Members.from_stacked_vectors(np.random.rand(6, 4))
+        members = Members.from_stacked_vectors(rng.random((6, 4)))
         clusters = DivisiveSupercluster(members)
         assert len(clusters.get_as_stacked_vectors()) == 1

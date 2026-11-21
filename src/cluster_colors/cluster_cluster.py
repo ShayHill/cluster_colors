@@ -68,7 +68,7 @@ def _split_floats(floats: Iterable[float]) -> int:
     cut (`cut_colors`) process.
     """
     floats = sorted(floats)
-    if len(floats) < 2:
+    if len(floats) < 2:  # noqa: PLR2004
         msg = "Cannot split a list of floats with fewer than 2 elements"
         raise ValueError(msg)
 
@@ -289,7 +289,7 @@ class Cluster:
         will always be the case with two members, but it is theoretically possible
         with more members. That won't happen, but it's cheap to cover the case.
         """
-        if len(self.ixs) < 3:
+        if len(self.ixs) < 3:  # noqa: PLR2004
             return self._get_weighted_medoid()
 
         row_sums = self.members.pmatrix[np.ix_(self.ixs, self.ixs)].sum(axis=1)

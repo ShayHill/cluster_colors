@@ -1,8 +1,8 @@
 vim9script
 
-# run the main python file with
-nnoremap <leader>m :update<CR>:ScratchTermReplaceU python src/cluster-colors2/main.py<CR>
-inoremap <leader>m <esc>:update<CR>:ScratchTermReplaceU python src/cluster-colors2/main.py<CR>
+# run the main python file
+nnoremap <leader>m :update<CR>:ScratchTermReplaceU .venv/Scripts/python.exe src/cluster_colors/main.py<CR>
+nnoremap <leader>l :call g:RunPrecommit()<CR>
+nnoremap <leader>L :call g:RunPrecommitAll()<CR>
 
-# resize the code window after running a python file
-nnoremap <leader>w :resize 65<CR>
+set grepprg=rg\ --vimgrep\ --no-heading\ --glob\ !binaries\ --glob\ !resources\ --glob\ !uv.lock

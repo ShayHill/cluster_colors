@@ -26,41 +26,42 @@ from cluster_colors.vector_stacker import stack_vectors
 
 ColorsArray = Annotated[npt.NDArray[np.floating], (-1, 3)]
 
+rng = np.random.default_rng()
+
 
 @pytest.fixture(
-    scope="function",
-    params=[np.random.randint(0, 255, (100, 4), dtype=np.uint8) for _ in range(10)],
+    params=[rng.integers(0, 255, size=(100, 4), dtype=np.uint8) for _ in range(10)]
 )
 def colors(request: pytest.FixtureRequest) -> ColorsArray:
     return stack_vectors(request.param)
 
 
 class TestKMedians:
-    def test_get_rsorted_clusters(self, colors: ColorsArray):
+    def test_get_rsorted_clusters(self, colors: ColorsArray) -> None:
         """Test that the clusters are sorted by the number of colors in them"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(16)
         _ = clusters.get_as_stacked_vectors()
 
-    def test_split_to_n(self, colors: ColorsArray):
+    def test_split_to_n(self, colors: ColorsArray) -> None:
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(10)
         assert clusters.get_as_stacked_vectors().shape == (10, 4)
 
-    def test_get_rsorted_exemplars(self, colors: ColorsArray):
+    def test_get_rsorted_exemplars(self, colors: ColorsArray) -> None:
         """Test that the clusters are sorted by the number of colors in them"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(16)
         assert clusters.get_as_vectors().shape == (16, 3)
 
-    def test_merge_to_n(self, colors: ColorsArray):
+    def test_merge_to_n(self, colors: ColorsArray) -> None:
         clusters = AgglomerativeSupercluster.from_stacked_vectors(colors[:24])
         clusters.set_n(10)
         assert clusters.get_as_stacked_vectors().shape == (10, 4)
 
 
 class TestSubset:
-    def test_subset_init_reindex_false(self, colors: ColorsArray):
+    def test_subset_init_reindex_false(self, colors: ColorsArray) -> None:
         """Vectors and pmatrix are unchanged."""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters_m = len(clusters.ixs)
@@ -72,7 +73,7 @@ class TestSubset:
         assert subset.members.pmatrix.shape == (clusters_m, clusters_m)
         np.testing.assert_array_equal(subset_ixs, subset.ixs)
 
-    def test_subset_init_reindex_true(self, colors: ColorsArray):
+    def test_subset_init_reindex_true(self, colors: ColorsArray) -> None:
         """Vectors and pmatrix are filtered. Indices are sequential."""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(8)
@@ -84,7 +85,7 @@ class TestSubset:
         assert subset.members.pmatrix.shape == (subset_cnt, subset_cnt)
         np.testing.assert_array_equal(subset.ixs, range(subset_cnt))
 
-    def test_subset_split_reindex_false(self, colors: ColorsArray):
+    def test_subset_split_reindex_false(self, colors: ColorsArray) -> None:
         """Nothing should change"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters_m = len(clusters.ixs)
@@ -97,7 +98,7 @@ class TestSubset:
         assert subset.members.pmatrix.shape == (clusters_m, clusters_m)
         np.testing.assert_array_equal(subset_ixs, subset.ixs)
 
-    def test_subset_split_reindex_true(self, colors: ColorsArray):
+    def test_subset_split_reindex_true(self, colors: ColorsArray) -> None:
         """Nothing should change"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(8)
@@ -109,7 +110,7 @@ class TestSubset:
         assert subset.members.weights.shape == (subset_cnt,)
         assert subset.members.pmatrix.shape == (subset_cnt, subset_cnt)
 
-    def test_split_past_m_reindex_false(self, colors: ColorsArray):
+    def test_split_past_m_reindex_false(self, colors: ColorsArray) -> None:
         """Raise FailedToSplitError if trying to split past m"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(8)
@@ -119,7 +120,7 @@ class TestSubset:
         with pytest.raises(FailedToSplitError):
             subset.split()
 
-    def test_split_past_m_reindex_true(self, colors: ColorsArray):
+    def test_split_past_m_reindex_true(self, colors: ColorsArray) -> None:
         """Raise FailedToSplitError if trying to split past m"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(8)
@@ -129,7 +130,7 @@ class TestSubset:
         with pytest.raises(FailedToSplitError):
             subset.split()
 
-    def test_exc_clusters_vs_exc_member_clusters(self, colors: ColorsArray):
+    def test_exc_clusters_vs_exc_member_clusters(self, colors: ColorsArray) -> None:
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(8)
         exc_clusters = (4, 5, 6, 7)
@@ -142,7 +143,7 @@ class TestSubset:
         np.testing.assert_array_equal(subset_a.ixs, subset_b.ixs)
         np.testing.assert_array_equal(subset_b.ixs, subset_c.ixs)
 
-    def test_make_empty(self, colors: ColorsArray):
+    def test_make_empty(self, colors: ColorsArray) -> None:
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         clusters.set_n(8)
         empty = clusters.copy(exc_clusters=(0, 1, 2, 3, 4, 5, 6, 7))
@@ -150,7 +151,7 @@ class TestSubset:
 
 
 class TestPredicates:
-    def test_set_max_sum_error(self, colors: ColorsArray):
+    def test_set_max_sum_error(self, colors: ColorsArray) -> None:
         """Split as far as necessary to get below the threshold"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         for _ in range(10):
@@ -161,7 +162,7 @@ class TestPredicates:
         clusters.merge()
         assert clusters.get_max_sum_error() > max_sum_error
 
-    def test_set_max_span(self, colors: ColorsArray):
+    def test_set_max_span(self, colors: ColorsArray) -> None:
         """Split as far as necessary to get below the threshold"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         for _ in range(10):
@@ -172,7 +173,7 @@ class TestPredicates:
         clusters.merge()
         assert clusters.get_max_span() > max_span
 
-    def test_set_max_max_error(self, colors: ColorsArray):
+    def test_set_max_max_error(self, colors: ColorsArray) -> None:
         """Split as far as necessary to get below the threshold"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         for _ in range(10):
@@ -183,7 +184,7 @@ class TestPredicates:
         clusters.merge()
         assert clusters.get_max_max_error() > max_max_error
 
-    def test_set_avg_error(self, colors: ColorsArray):
+    def test_set_avg_error(self, colors: ColorsArray) -> None:
         """Split as far as necessary to get below the threshold"""
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)
         for _ in range(10):

@@ -12,29 +12,29 @@ from cluster_colors.cluster_cluster import _split_floats
 
 
 class TestSplitFloats:
-    def test_empty(self):
+    def test_empty(self) -> None:
         """Raise ValueError if no floats are passed."""
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="with fewer than"):
             _ = _split_floats([])
 
-    def test_single(self):
+    def test_single(self) -> None:
         """Raise ValueError if only one float is passed."""
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="with fewer than"):
             _ = _split_floats([1.0])
 
-    def test_identical(self):
+    def test_identical(self) -> None:
         """Return 0 if all floats are identical."""
         assert _split_floats([1.0, 1.0, 1.0]) == 0
 
-    def test_explicit(self):
+    def test_explicit(self) -> None:
         """Return the expected split."""
         assert _split_floats([1.0, 2.0, 3.0]) == 1
 
-    def test_explicit_2(self):
+    def test_explicit_2(self) -> None:
         """Return the expected split."""
         assert _split_floats([1.0, 2.0, 2.0, 3, 3, 3, 3, 3]) == 3
 
-    def test_explicit_3(self):
+    def test_explicit_3(self) -> None:
         """Return the expected split."""
         for i in range(76):
             assert _split_floats([-i, *range(100)]) == 50

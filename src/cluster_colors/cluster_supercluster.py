@@ -28,7 +28,7 @@ from __future__ import annotations
 import itertools as it
 from collections.abc import Callable
 from contextlib import suppress
-from typing import TYPE_CHECKING, Literal, TypeVar
+from typing import TYPE_CHECKING, Literal, Self, TypeVar
 
 import numpy as np
 from paragraphs import par
@@ -54,13 +54,12 @@ if TYPE_CHECKING:
 from typing import cast
 
 _CachedState = tuple[tuple[int, ...], ...]
-_SuperclusterT = TypeVar("_SuperclusterT", bound="SuperclusterBase")
 _GetterT = TypeVar("_GetterT", bound="Callable[[SuperclusterBase], float]")
 _SetterT = TypeVar("_SetterT", bound="Callable[[SuperclusterBase, float], None]")
 
 
 def check_empty_supercluster_get(method: _GetterT) -> _GetterT:
-    """Decorator to raise EmptySuperclusterError if self.n is 0.
+    """Define a decorator to raise EmptySuperclusterError if self.n is 0.
 
     Raise this exception for methods that are invalid on an empty supercluster.
     """
@@ -79,12 +78,12 @@ def check_empty_supercluster_get(method: _GetterT) -> _GetterT:
 
 
 def check_empty_supercluster_set(method: _SetterT) -> _SetterT:
-    """Decorator to raise EmptySuperclusterError if self.n is 0.
+    """Define a decorator to raise EmptySuperclusterError if self.n is 0.
 
     Raise this exception for methods that are invalid on an empty supercluster.
     """
 
-    def wrapper(self: SuperclusterBase, val: float):
+    def wrapper(self: SuperclusterBase, val: float) -> None:
         m_name = method.__name__
         if self.n == 0:
             msg = par(
@@ -179,10 +178,8 @@ class SuperclusterBase:
 
     @classmethod
     def from_vectors(
-        cls: type[_SuperclusterT],
-        vectors: VectorsLike,
-        pmatrix: ProximityMatrix | None = None,
-    ) -> _SuperclusterT:
+        cls, vectors: VectorsLike, pmatrix: ProximityMatrix | None = None
+    ) -> Self:
         """Create a SuperclusterBase instance from a sequence or array of colors.
 
         :param vectors: An iterable of vectors
@@ -197,10 +194,8 @@ class SuperclusterBase:
 
     @classmethod
     def from_stacked_vectors(
-        cls: type[_SuperclusterT],
-        stacked_vectors: VectorsLike,
-        pmatrix: ProximityMatrix | None = None,
-    ) -> _SuperclusterT:
+        cls, stacked_vectors: VectorsLike, pmatrix: ProximityMatrix | None = None
+    ) -> Self:
         """Create a Cluster instance from an array of colors with a weight axis.
 
         :param stacked_vectors: An iterable of vectors with a weight axis
@@ -238,8 +233,8 @@ class SuperclusterBase:
         members = set(it.chain(*[self.clusters[c_i].ixs for c_i in clusters]))
         return members | set(member_ixs)
 
-    def copy(
-        self: _SuperclusterT,
+    def copy(  # noqa: PLR0913
+        self,
         *,
         inc_clusters: Iterable[int] = (),
         inc_member_clusters: Iterable[int] = (),
@@ -248,7 +243,7 @@ class SuperclusterBase:
         exc_member_clusters: Iterable[int] = (),
         exc_members: Iterable[int] = (),
         reindex: bool = False,
-    ) -> _SuperclusterT:
+    ) -> Self:
         """Create a SuperclusterBase instance from a subset of clusters.
 
         :param inc_clusters: indices of clusters to include in the subset
@@ -487,7 +482,7 @@ class SuperclusterBase:
         self._split_to_n(n)
         self._merge_to_n(n)
 
-    def split(self):
+    def split(self) -> None:
         """Split the cluster with the highest sum error.
 
         This sets the state of the Supercluster instance. If the state is already
@@ -498,7 +493,7 @@ class SuperclusterBase:
             raise exceptions.FailedToSplitError(msg)
         self._split_to_n(self.n + 1)
 
-    def merge(self):
+    def merge(self) -> None:
         """Merge the two clusters with the lowest sum error.
 
         This sets the state of the Supercluster instance. If the state is already
@@ -545,7 +540,7 @@ class SuperclusterBase:
         return max(c.span for c in self.clusters)
 
     @check_empty_supercluster_set
-    def set_max_sum_error(self, max_sum_error: float):
+    def set_max_sum_error(self, max_sum_error: float) -> None:
         """Split as far as necessary to get below the threshold.
 
         :param min_proximity: maximum sum of errors of any cluster
@@ -562,7 +557,7 @@ class SuperclusterBase:
         return max(c.span for c in self.clusters)
 
     @check_empty_supercluster_set
-    def set_max_span(self, max_span: float):
+    def set_max_span(self, max_span: float) -> None:
         """Split as far as necessary to get below the threshold.
 
         :param min_max_error: maximum span of any cluster
@@ -579,7 +574,7 @@ class SuperclusterBase:
         return max(c.max_error for c in self.clusters)
 
     @check_empty_supercluster_set
-    def set_max_max_error(self, max_max_error: float):
+    def set_max_max_error(self, max_max_error: float) -> None:
         """Split as far as necessary to get below the threshold.
 
         :param min_max_error: maximum max_error of any cluster
@@ -596,7 +591,7 @@ class SuperclusterBase:
         return max(c.avg_error for c in self.clusters)
 
     @check_empty_supercluster_set
-    def set_max_avg_error(self, max_avg_error: float):
+    def set_max_avg_error(self, max_avg_error: float) -> None:
         """Split as far as necessary to get below the threshold.
 
         :param max_avg_error: maximum avg_error of any cluster
@@ -611,7 +606,7 @@ class SuperclusterBase:
     #   the reassignment step for divisive clustering
     # ===========================================================================
 
-    def _reassign(self, _previous_medoids: set[tuple[int, ...]] | None = None):
+    def _reassign(self, _previous_medoids: set[tuple[int, ...]] | None = None) -> None:
         """Reassign members based on proximity to cluster medoids.
 
         :param _previous_medoids: set of cluster medoids that have already been seen.

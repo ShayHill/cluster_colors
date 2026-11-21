@@ -8,8 +8,7 @@ _TEST_IMAGE = TEST_DIR / "sugar-shack-barnes.jpg"
 
 
 class TestGetBiggestColor:
-
-    def test_display(self):
+    def test_display(self) -> None:
         """Test display_biggest_color function."""
         colors = image_colors.stack_pool_cut_image_colors(_TEST_IMAGE)
         clusters = DivisiveSupercluster.from_stacked_vectors(colors)

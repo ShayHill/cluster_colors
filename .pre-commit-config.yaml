@@ -1,12 +1,12 @@
 ci:
   skip: [pyright]
 
-# exclude: "tests"
+exclude: "typings"
 
 repos:
 
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v5.0.0
+  rev: v6.0.0
   hooks:
     - id: check-added-large-files
     - id: check-ast
@@ -31,9 +31,6 @@ repos:
     - id: mixed-line-ending
     - id: requirements-txt-fixer
     - id: trailing-whitespace
-    - id: fix-encoding-pragma
-      args:
-      - --remove
     - id: name-tests-test
       args:
       - --pytest-test-first
@@ -44,98 +41,41 @@ repos:
         # files: .pre-commit-config.yaml
 
 - repo: https://github.com/pre-commit/mirrors-mypy
-  rev: v1.16.0
+  rev: v2.4.1
   hooks:
   - id: mypy
-    name: mypy
-    language: python
-    language_version: python 3.10
     types: [python]
     require_serial: true
     verbose: true
-    additional_dependencies: ['types-requests']
+    # additional_dependencies: ['types-requests']
     # exclude: "tests"
     # args:
     # - --ignore-missing-imports
     # files: ^(src/|tests/)
 
-- repo: https://github.com/PyCQA/isort
-  rev: 6.0.1
-  hooks:
-  - id: isort
-    args: ["--profile", "black", "--filter-files", "--combine-as", "honor--noqa"]
-
-- repo: https://github.com/psf/black
-  rev: 25.1.0
-  hooks:
-  - id: black
-    language_version: python3.10
-    args: ["--skip-magic-trailing-comma"]
-
 - repo: https://github.com/asottile/pyupgrade
-  rev: v3.20.0
+  rev: v3.22.0
   hooks:
   - args:
-    - --py310-plus
+    - --py311-plus
     id: pyupgrade
 
 - repo: https://github.com/Lucas-C/pre-commit-hooks
-  rev: v1.5.5
+  rev: v1.5.6
   hooks:
   - id: remove-tabs
 
-# - repo: https://github.com/commitizen-tools/commitizen
-#   rev: v2.40.0
-#   hooks:
-#   - id: commitizen
-
-# pylint still broken in python 3.12
-# - repo: https://github.com/pre-commit/mirrors-pylint
-#   rev: v3.0.0a5
-#   hooks:
-#   - id: pylint
-#     exclude: "tests"
-#     name: pylint
-#     args:
-#     - --good-names=i,j,_,f
-#     - --disable=protected-access
-#     - --disable=no-member
-#     - --disable=import-error
-#     - --disable=no-name-in-module
-#     - --load-plugins=pylint.extensions.docparams
-#     - --accept-no-param-doc=n
-#     - --accept-no-raise-doc=n
-#     - --accept-no-return-doc=n
-#     - --accept-no-yields-doc=n
-
+# ruff config (select/ignore/fixable/target-version) lives in pyproject.toml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
-  # ignores
-  # COM812 Trailing comma missing (does not agree with Black)
-  # D203 1 blank line required before class docstring (incompatible with D211)
-  # D213 multi line summary second line (incompatible with D212):
-  # ISC003 Explicitly concatenated string should be implicitly concatenated
-  #
-  # ANN201 Asks for -> None return type annotation for public methods
-  # ANN202 Asks for -> None return type annotation for private methods
-  # D400 First line should end with a period
-  # D401 First line should be in imperative mood
-  # PYI019 Method should used typing.Self instead of TypeVar (incompatible with Python 3.10)
-  # PLR2004 Magic numbers
-  # SIM108 Use ternary operator
-  # PLR0913 Too many arguments
-  #
-  rev: 'v0.11.13'
+  rev: 'v0.17.6'
   hooks:
     - id: ruff
-      exclude: "tests"
-      args:
-      - --target-version=py310
-      - --select=ALL
-      - --ignore=COM812,D203,D213,ISC003,ANN201,ANN202,D400,D401,PYI019,PLR2004,SIM108,PLR0913
-      # - --fix
+      args: ["--fix"]
+    - id: ruff-format
+      name: "ruff-format"
 
-# reads pyproject.toml for additional config
-- repo: https://github.com/RobertCraigie/pyright-python
-  rev: v1.1.402
+# basedpyright config (select/ignore/fixable/target-version) lives in pyproject.toml
+- repo: https://github.com/DetachHead/basedpyright-pre-commit-mirror
+  rev: 1.40.2
   hooks:
-    - id: pyright
+  - id: basedpyright

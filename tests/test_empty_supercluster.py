@@ -17,36 +17,37 @@ from cluster_colors.vector_stacker import stack_vectors
 
 ColorsArray = Annotated[npt.NDArray[np.floating], (-1, 3)]
 
+rng = np.random.default_rng()
+
 
 @pytest.fixture(
-    scope="function",
-    params=[np.random.randint(0, 255, (100, 4), dtype=np.uint8) for _ in range(10)],
+    params=[rng.integers(0, 255, size=(100, 4), dtype=np.uint8) for _ in range(10)]
 )
 def colors(request: pytest.FixtureRequest) -> ColorsArray:
     return stack_vectors(request.param)
 
 
 class TestKMedians:
-    def test_init(self, colors: ColorsArray):
+    def test_init(self, colors: ColorsArray) -> None:
         """Test that the clusters are sorted by the number of colors in them"""
         members = Members(colors)
         empty_supercluster = DivisiveSupercluster(members, [])
         assert empty_supercluster.members == members
         assert empty_supercluster.clusters == []
 
-    def test_as_stacked_vectors(self, colors: ColorsArray):
+    def test_as_stacked_vectors(self, colors: ColorsArray) -> None:
         """Test that the clusters are sorted by the number of colors in them"""
         members = Members(colors)
         empty_supercluster = DivisiveSupercluster(members, [])
         assert empty_supercluster.get_as_stacked_vectors().shape == (0, 4)
 
-    def test_as_vectors(self, colors: ColorsArray):
+    def test_as_vectors(self, colors: ColorsArray) -> None:
         """Test that the clusters are sorted by the number of colors in them"""
         members = Members(colors)
         empty_supercluster = DivisiveSupercluster(members, [])
         assert empty_supercluster.get_as_vectors().shape == (0, 3)
 
-    def test_split(self, colors: ColorsArray):
+    def test_split(self, colors: ColorsArray) -> None:
         """Test that the clusters are sorted by the number of colors in them"""
         members = Members(colors)
         empty_supercluster = DivisiveSupercluster(members, [])
@@ -54,7 +55,7 @@ class TestKMedians:
             empty_supercluster.split()
         assert exc.match("No clusters to split.")
 
-    def test_merge(self, colors: ColorsArray):
+    def test_merge(self, colors: ColorsArray) -> None:
         """Test that the clusters are sorted by the number of colors in them"""
         members = Members(colors)
         empty_supercluster = DivisiveSupercluster(members, [])
@@ -62,21 +63,21 @@ class TestKMedians:
             empty_supercluster.merge()
         assert exc.match("No clusters to merge.")
 
-    def test_set_n(self, colors: ColorsArray):
+    def test_set_n(self, colors: ColorsArray) -> None:
         members = Members(colors)
         empty_supercluster = DivisiveSupercluster(members, [])
         with pytest.raises(exceptions.EmptySuperclusterError) as exc:
             empty_supercluster.set_n(3)
         assert exc.match("No clusters to merge or split.")
 
-    def test_get_max_sum(self, colors: ColorsArray):
+    def test_get_max_sum(self, colors: ColorsArray) -> None:
         """Test that the clusters are sorted by the number of colors in them"""
         members = Members(colors)
         empty_supercluster = DivisiveSupercluster(members, [])
         with pytest.raises(exceptions.EmptySuperclusterError):
             _ = empty_supercluster.get_max_sum_error()
 
-    def test_set_max_sum(self, colors: ColorsArray):
+    def test_set_max_sum(self, colors: ColorsArray) -> None:
         """Test that the clusters are sorted by the number of colors in them"""
         members = Members(colors)
         empty_supercluster = DivisiveSupercluster(members, [])

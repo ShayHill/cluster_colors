@@ -94,7 +94,7 @@ class Members:
             self._pmatrix = pmatrix[np.ix_(sort_indices, sort_indices)]
 
     def __len__(self) -> int:
-        """Number of members in the Members instance.
+        """Return number of members in the Members instance.
 
         :return: number of members
         """
